@@ -16,7 +16,7 @@ export interface StudyResults {study:Study;sessions:Session[];events:ClickEvent[
 export interface ParticipantComment { id?:number; sessionId?:string; variant:Variant; screenId?:string; componentPath?:string; label:string; kind?:'interactive'|'static'; text:string; elapsedMs:number; phase?:string; viewportWidth?:number; viewportHeight?:number; createdAt?:string; }
 /** 과업 완료 기준(시안별). componentPath·text 중 하나 이상. componentLabel 은 목록이 다시 그려져 경로가 바뀔 때의 보조 매칭용. */
 export type StateProperty='text'|'value'|'checked'|'attr';
-export interface StateCriterion { anchor?:string; path:string; property:StateProperty; attr?:string; expected:string; match:'equals'|'contains'; label?:string; }
+export interface StateCriterion { anchor?:string; anchorIndex?:number; path:string; property:StateProperty; attr?:string; expected:string; match:'equals'|'contains'; label?:string; }
 export interface TaskCriteria { componentPath?:string; componentLabel?:string; state?:StateCriterion; }
 /** 의뢰자가 설정하는 과업. 자유 탐색이 끝난 뒤 순서대로 진행한다. */
 export interface StudyTask { id:string; instruction:string; timeLimitSeconds:number; criteria:Record<Variant,TaskCriteria>; }

@@ -15,6 +15,7 @@ export const TASK_LIMITS = {
   timeDefault: 120,
   expectedMax: 200,
   anchorMax: 300,
+  anchorIndexMax: 200,
   pathMax: 1000,
   labelMax: 100,
 } as const;
@@ -45,7 +46,7 @@ export function matchTask(criteria: TaskCriteria | null | undefined, hit: TaskHi
  */
 export function readState(state: StateCriterion, doc: Document): string | null {
   try {
-    const root: Element | null = state.anchor ? doc.querySelector(state.anchor) : doc.body;
+    const root: Element | null = state.anchor ? doc.querySelectorAll(state.anchor)[state.anchorIndex || 0] || null : doc.body;
     if (!root) return null;
     const el: Element | null = state.path ? root.querySelector(':scope > ' + state.path) : root;
     if (!el) return null;
@@ -79,6 +80,10 @@ function cleanState(raw: unknown, label: string): StateCriterion {
   if (r.anchor !== undefined && r.anchor !== null && r.anchor !== '') {
     if (typeof r.anchor !== 'string' || !r.anchor.trim() || r.anchor.length > TASK_LIMITS.anchorMax) throw fail(`앵커 1~${TASK_LIMITS.anchorMax}자`);
     out.anchor = r.anchor;
+  }
+  if (r.anchorIndex !== undefined && r.anchorIndex !== null) {
+    if (typeof r.anchorIndex !== 'number' || !Number.isInteger(r.anchorIndex) || r.anchorIndex < 0 || r.anchorIndex > TASK_LIMITS.anchorIndexMax) throw fail(`앵커 순번 0~${TASK_LIMITS.anchorIndexMax}`);
+    if (r.anchorIndex > 0 && out.anchor) out.anchorIndex = r.anchorIndex;
   }
   if (r.path !== undefined && r.path !== null) {
     if (typeof r.path !== 'string' || r.path.length > TASK_LIMITS.pathMax) throw fail(`경로 ${TASK_LIMITS.pathMax}자 이하`);
@@ -217,14 +222,15 @@ export function verifyAttempt(
   if (attempt.matchedBy === 'state') {
     const state = criteria.state;
     if (!state || !evidenceHtml || !evidenceProof || !evidenceProof.trim()) return false;
-    const at = evidenceHtml.indexOf(evidenceProof);
-    if (at < 0) return false;
-    if (state.anchor) {
-      const needle = anchorNeedle(state.anchor);
-      if (!needle) return false;
-      const found = evidenceHtml.indexOf(needle);
-      if (found < 0 || found >= at + evidenceProof.length) return false;
+    // 증명 문자열은 화면 안에 여러 번 나올 수 있다(같은 배지가 다른 행에도 있음) → 앵커 뒤에 오는 어느 한 곳이면 된다.
+    const needle = state.anchor ? anchorNeedle(state.anchor) : null;
+    if (state.anchor && !needle) return false;
+    let found = false;
+    for (let at = evidenceHtml.indexOf(evidenceProof); at >= 0 && !found; at = evidenceHtml.indexOf(evidenceProof, at + 1)) {
+      if (!needle) found = true;
+      else { const a = evidenceHtml.indexOf(needle); found = a >= 0 && a < at + evidenceProof.length; }
     }
+    if (!found) return false;
     return stateMatches(state, proofValue(state, evidenceProof));
   }
   return false;

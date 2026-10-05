@@ -105,7 +105,7 @@ test('readState: text / value / checked / attr, 앵커 없으면 body, 없으면
   const anchor = { ...fakeEl({}), querySelector: (sel) => (sel === ':scope > span:nth-of-type(1)' ? badge : null) };
   const doc = {
     body: { querySelector: (sel) => (sel === ':scope > select:nth-of-type(1)' ? fakeEl({ value: 'warning' }) : sel === ':scope > input:nth-of-type(1)' ? fakeEl({ checked: true }) : null) },
-    querySelector: (sel) => (sel === '[data-project-id="PRJ-101"]' ? anchor : null),
+    querySelectorAll: (sel) => (sel === '[data-project-id="PRJ-101"]' ? [anchor] : []),
   };
   assert.equal(readState(st(), doc), '  주의 ');
   assert.equal(readState(st({ property: 'attr', attr: 'x' }), doc), null);
@@ -114,17 +114,17 @@ test('readState: text / value / checked / attr, 앵커 없으면 body, 없으면
   assert.equal(readState(st({ path: 'em:nth-of-type(1)' }), doc), null);
   assert.equal(readState(st({ anchor: '[nope]' }), doc), null);
   const selfAnchor = fakeEl({ attrs: { 'data-status': 'warning' } });
-  const doc2 = { body: {}, querySelector: () => selfAnchor };
+  const doc2 = { body: {}, querySelectorAll: () => [selfAnchor] };
   assert.equal(readState(st({ path: '', property: 'attr', attr: 'data-status' }), doc2), 'warning');
   assert.equal(readState(st({ path: '', property: 'attr', attr: 'data-none' }), doc2), null);
-  const throwing = { body: {}, querySelector: () => { throw new Error('bad selector'); } };
+  const throwing = { body: {}, querySelectorAll: () => { throw new Error('bad selector'); } };
   assert.equal(readState(st(), throwing), null);
 });
 
 test('readState / stateMatches 는 toString() 으로 직렬화해도 같은 결과', () => {
   const rs = new Function(`return (${readState.toString()})`)();
   const sm = new Function(`return (${stateMatches.toString()})`)();
-  const doc = { body: {}, querySelector: () => ({ ...fakeEl({ innerText: ' 주의 ' }), querySelector: () => fakeEl({ innerText: '주의' }) }) };
+  const doc = { body: {}, querySelectorAll: () => [{ ...fakeEl({ innerText: ' 주의 ' }), querySelector: () => fakeEl({ innerText: '주의' }) }] };
   assert.equal(rs(st(), doc), readState(st(), doc));
   assert.equal(sm(st(), '주 의'), stateMatches(st(), '주 의'));
 });
@@ -188,4 +188,26 @@ test('verifyAttempt(state): select·checked·attr·contains 분기', () => {
   assert.equal(run(mk({ anchor: '#b', path: '', property: 'attr', attr: 'data-none', expected: 'x', match: 'contains' }), badge), false);
   const fake = '<span id="b"><script>주의</script>안정</span>';
   assert.equal(run(mk({ anchor: '#b', path: '', property: 'text', expected: '주의', match: 'contains' }), fake), false);
+});
+
+test('verifyAttempt(state): 같은 증명이 앵커 앞의 다른 행에도 있어도, 앵커 뒤에 있으면 통과', () => {
+  const task = parseTasks([{ instruction: 'a', criteria: { A: { state: st({ anchor: ANCHOR }) }, B: { state: st() } } }])[0];
+  const proof = proofOf('주의');
+  const html = `<html><body><table><tr data-project-id="PRJ-102"><td>${proof}</td></tr><tr data-project-id="PRJ-101"><td>${proof}</td></tr></table></body></html>`;
+  assert.equal(verifyAttempt(task, 'A', { outcome: 'success', matchedBy: 'state' }, [], html, proof), true);
+  const onlyBefore = `<html><body><tr data-project-id="PRJ-102"><td>${proof}</td></tr><tr data-project-id="PRJ-101"><td>안정</td></tr></body></html>`;
+  assert.equal(verifyAttempt(task, 'A', { outcome: 'success', matchedBy: 'state' }, [], onlyBefore, proof), false);
+});
+
+test('anchorIndex: 같은 선택자가 여러 요소와 맞을 때 고른 요소를 읽는다 / 검증', () => {
+  const mkAnchor = (txt) => ({ ...fakeEl({}), querySelector: () => fakeEl({ innerText: txt }) });
+  const doc = { body: {}, querySelectorAll: () => [mkAnchor('안정'), mkAnchor('주의')] };
+  assert.equal(readState(st(), doc), '안정');
+  assert.equal(readState(st({ anchorIndex: 0 }), doc), '안정');
+  assert.equal(readState(st({ anchorIndex: 1 }), doc), '주의');
+  assert.equal(readState(st({ anchorIndex: 5 }), doc), null);
+  const bad = (v) => parseTasks([{ instruction: 'a', criteria: { A: { state: st({ anchorIndex: v }) }, B: { state: st() } } }]);
+  assert.equal(bad(3)[0].criteria.A.state.anchorIndex, 3);
+  assert.equal(bad(0)[0].criteria.A.state.anchorIndex, undefined);
+  for (const v of [-1, 201, 1.5, '1']) assert.throws(() => bad(v), /목표 상태/);
 });

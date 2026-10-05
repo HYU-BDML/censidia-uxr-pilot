@@ -21,7 +21,7 @@ export type PrototypeClick = {
   viewportWidth: number;
   viewportHeight: number;
   /** 선택(mindlens-pick) 때만: 상태 기준 후보. 앵커·경로·표시 이름과 현재 속성 값들 */
-  stateTarget?: { anchor?: string; path: string; label: string; props: { text: string; value?: string; checked?: string; attrs: Record<string, string> } };
+  stateTarget?: { anchor?: string; anchorIndex?: number; path: string; label: string; props: { text: string; value?: string; checked?: string; attrs: Record<string, string> } };
 };
 
 /**
@@ -132,20 +132,27 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
       if (up.hasAttribute('data-field') || up.hasAttribute('data-setting')) { el = up; break; }
       up = up.parentElement;
     }
+    // 같은 선택자가 여러 요소와 맞을 수 있다(보드 카드·목록 행·상세 패널) → 보이는 앵커를 우선하고, 고른 요소의 순번을 함께 저장한다.
     let anchorEl: Element | null = null;
     let anchor: string | undefined;
     let node: Element | null = el;
     while (node && node !== document.body && node !== document.documentElement) {
       const sel = anchorSelector(node);
-      if (sel) { anchorEl = node; anchor = sel; break; }
+      if (sel) {
+        if (!anchorEl) { anchorEl = node; anchor = sel; }
+        if (node.getClientRects().length > 0) { anchorEl = node; anchor = sel; break; }
+      }
       node = node.parentElement;
     }
+    let anchorIndex = 0;
+    if (anchorEl && anchor) anchorIndex = Math.max(0, Array.prototype.indexOf.call(document.querySelectorAll(anchor), anchorEl));
     const path = anchorEl ? (anchorEl === el ? '' : chainFrom(el, anchorEl)) : chainFrom(el, document.body);
     const field = el.getAttribute('data-field') || el.getAttribute('data-setting') || '';
     let name = '';
     if (anchorEl) {
       const nameEl = anchorEl.querySelector('[data-field="name"]') || anchorEl.querySelector('h1,h2,h3,h4,h5,h6');
       if (nameEl && nameEl !== el) name = clip((nameEl as HTMLElement).innerText || nameEl.textContent || '').slice(0, 60);
+      else if (anchorEl.getAttribute('aria-label')) name = clip(anchorEl.getAttribute('aria-label') as string).slice(0, 60);
     }
     const label = [name, field].filter(Boolean).join(' · ').slice(0, 100);
     const live = el as HTMLInputElement;
@@ -157,7 +164,7 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
     const props: { text: string; value?: string; checked?: string; attrs: Record<string, string> } = { text: clip((el as HTMLElement).innerText || el.textContent || ''), attrs };
     if (typeof live.value === 'string' && /^(input|select|textarea)$/.test(el.localName)) { props.value = live.value.slice(0, 200); attrs.value = props.value; }
     if (el.localName === 'input' && (live.type === 'checkbox' || live.type === 'radio')) props.checked = String(!!live.checked);
-    return { anchor, path, label, props };
+    return { anchor, anchorIndex: anchorIndex || undefined, path, label, props };
   }
 
   // 부모가 보내는 의견 모드 스위치. 켜져 있으면 클릭은 시안에 닿지 않고 'mindlens-pick' 으로만 올라간다.
@@ -194,7 +201,7 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
     if (!st || !stateOk(st, read(st, document))) return;
     let proof = '';
     try {
-      const root: Element | null = st.anchor ? document.querySelector(st.anchor) : document.body;
+      const root: Element | null = st.anchor ? document.querySelectorAll(st.anchor)[st.anchorIndex || 0] || null : document.body;
       const el = root && st.path ? root.querySelector(':scope > ' + st.path) : root;
       if (el) {
         const copy = el.cloneNode(true) as Element;

@@ -20,7 +20,7 @@ const norm=(v:string)=>v.replace(/\s+/g,'').toLowerCase();
 /** 미리보기에서 고른 요소의 현재 속성 값들(상태 기준 후보). 저장되지 않고 설정 화면에서만 쓴다. */
 export type StateProps={text:string;value?:string;checked?:string;attrs:Record<string,string>};
 export type PickedState={state:StateCriterion;props:StateProps};
-type PickMsg={componentPath?:string;component?:string;stateTarget?:{anchor?:string;path:string;label:string;props:StateProps}};
+type PickMsg={componentPath?:string;component?:string;stateTarget?:{anchor?:string;anchorIndex?:number;path:string;label:string;props:StateProps}};
 type Option={property:StateCriterion['property'];attr?:string;title:string;current:string};
 const optionsOf=(p:StateProps):Option[]=>{const o:Option[]=[{property:'text',title:'텍스트',current:p.text}];if(p.value!==undefined)o.push({property:'value',title:'값',current:p.value});if(p.checked!==undefined)o.push({property:'checked',title:'체크',current:p.checked});for(const[k,v]of Object.entries(p.attrs))if(k!=='value')o.push({property:'attr',attr:k,title:`속성 ${k}`,current:v});return o;};
 const currentOf=(p:StateProps|undefined,st:StateCriterion):string|undefined=>{if(!p)return undefined;if(st.property==='text')return p.text;if(st.property==='value')return p.value;if(st.property==='checked')return p.checked;return st.attr?p.attrs[st.attr]:undefined;};
@@ -98,6 +98,6 @@ export default function TaskEditor({htmlA,htmlB,value,onChange}:{htmlA:string|nu
         </div>
       </div>;})}
     <button type="button" className={s.button} style={{marginTop:10}} disabled={value.length>=TASK_LIMITS.maxTasks} onClick={()=>onChange([...value,newTaskDraft()])}><Plus size={14}/>과업 추가</button>
-    {picking&&pickedTask&&html[picking.variant]&&<PickerModal html={html[picking.variant] as string} variant={picking.variant} mode={picking.mode} onClose={()=>setPicking(null)} onPick={(d)=>{if(picking.mode==='state'&&d.stateTarget){const t=d.stateTarget;setCriteria(picking.key,picking.variant,{state:{...(t.anchor?{anchor:t.anchor}:{}),path:t.path,property:'text',expected:'',match:'equals',...(t.label?{label:t.label}:{})}});setInfos(o=>({...o,[`${picking.key}:${picking.variant}`]:t.props}));}else if(d.componentPath)setCriteria(picking.key,picking.variant,{componentPath:d.componentPath,componentLabel:String(d.component||'').slice(0,TASK_LIMITS.labelMax)});setPicking(null);}}/>}
+    {picking&&pickedTask&&html[picking.variant]&&<PickerModal html={html[picking.variant] as string} variant={picking.variant} mode={picking.mode} onClose={()=>setPicking(null)} onPick={(d)=>{if(picking.mode==='state'&&d.stateTarget){const t=d.stateTarget;setCriteria(picking.key,picking.variant,{state:{...(t.anchor?{anchor:t.anchor}:{}),...(t.anchor&&t.anchorIndex?{anchorIndex:t.anchorIndex}:{}),path:t.path,property:'text',expected:'',match:'equals',...(t.label?{label:t.label}:{})}});setInfos(o=>({...o,[`${picking.key}:${picking.variant}`]:t.props}));}else if(d.componentPath)setCriteria(picking.key,picking.variant,{componentPath:d.componentPath,componentLabel:String(d.component||'').slice(0,TASK_LIMITS.labelMax)});setPicking(null);}}/>}
   </div>;
 }
