@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.env.local
+data/*
+!data/.gitkeep
+*.tsbuildinfo
+*.swp
+*.swo
