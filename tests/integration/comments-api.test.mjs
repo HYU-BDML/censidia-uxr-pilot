@@ -57,3 +57,14 @@ test('완료한 세션은 의견을 더 저장할 수 없다(409)', async () => 
   assert.equal((await patch(`/api/sessions/${session.id}`, { elapsedA: 15, elapsedB: 15, preference: 'A', status: 'completed' })).status, 200);
   assert.equal((await post(`/api/sessions/${session.id}/comments`, { comments: [comment()] })).status, 409);
 });
+
+test('의견의 phase 는 화이트리스트 형식만 저장한다', async () => {
+  const fresh = (await (await post('/api/sessions', { studyId: study.id, name: 'phase-tester' })).json()).session;
+  const r = await post(`/api/sessions/${fresh.id}/comments`, { comments: [comment({ variant: fresh.currentVariant, text: 'p-task', phase: 'task:t2' }), comment({ variant: fresh.currentVariant, text: 'p-free', phase: 'free' }), comment({ variant: fresh.currentVariant, text: 'p-bad', phase: 'task:../x' })] });
+  assert.equal(r.status, 200);
+  const results = await (await fetch(`${BASE}/api/studies/${study.id}/results`)).json();
+  const by = (t) => results.comments.find((c) => c.text === t);
+  assert.equal(by('p-task').phase, 'task:t2');
+  assert.equal(by('p-free').phase, 'free');
+  assert.equal(by('p-bad').phase, undefined);
+});
