@@ -31,7 +31,21 @@ export default function ComponentHeatmap({ events }: { events: ClickEvent[] }) {
   }, [screen, hover]);
 
   useEffect(send, [send]);
-  useEffect(() => setMissing([]), [screen?.id]);
+  const [html, setHtml] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const screenKey = screen?.id;
+  useEffect(() => { setMissing([]); setHover(''); }, [screenKey]);
+  // 스냅샷은 fetch 로 받아 srcDoc 으로 넣는다 — 불투명 출처 iframe 의 직접 내비게이션은 일부 브라우저에서 차단된다.
+  useEffect(() => {
+    if (!screenKey) return;
+    const ctl = new AbortController();
+    setHtml(''); setLoadError(false);
+    fetch(`/api/screens/${screenKey}`, { signal: ctl.signal })
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+      .then(setHtml)
+      .catch((e) => { if (e?.name !== 'AbortError') setLoadError(true); });
+    return () => ctl.abort();
+  }, [screenKey]);
   useEffect(() => {
     const receive = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow || e.data?.type !== 'mindlens-heatmap-missing') return;
@@ -57,15 +71,15 @@ export default function ComponentHeatmap({ events }: { events: ClickEvent[] }) {
         {unsnapshotted > 0 && <p className={s.hint}>스냅샷 없는 클릭 {unsnapshotted}회는 히트맵에서 제외됩니다.</p>}
       </div>
       <div ref={box} style={{ position: 'relative', overflow: 'hidden', height: screen.viewportHeight * scale, border: '1px solid #e5e7eb', borderRadius: 12, background: '#fff' }}>
-        <iframe
+        {loadError ? <p className={s.hint} style={{ padding: 16 }}>화면 기록을 불러오지 못했습니다.</p> : !html ? <p className={s.hint} style={{ padding: 16 }}>화면 기록을 불러오는 중…</p> : <iframe
           key={screen.id}
           ref={frame}
-          src={`/api/screens/${screen.id}`}
+          srcDoc={html}
           sandbox="allow-scripts"
           title="클릭 순간의 화면"
           onLoad={send}
           style={{ width: screen.viewportWidth, height: screen.viewportHeight, border: 0, transform: `scale(${scale})`, transformOrigin: '0 0' }}
-        />
+        />}
       </div>
       <div className={s.tableWrap}>
         <table className={s.table}>

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { SURVEY_QUESTIONS, type Variant, type ClickEvent, type Session } from './types';
 import * as store from './db';
-import { screenHash, SCREEN_HASH_PATTERN, MAX_SCREEN_CHARS } from './screen-hash';
-import { prepareSnapshot } from './snapshot';
+import { screenHash, screenId, SCREEN_HASH_PATTERN, MAX_SCREEN_CHARS, MAX_SCREENS_PER_VARIANT } from './screen-hash';
+import { prepareSnapshot, PROTOTYPE_CSP } from './snapshot';
 export type RouteContext = {params:Promise<{id:string}>};
 export function api(handler:(request:Request,context:RouteContext)=>Promise<Response>|Response) {return async(request:Request,context:{params:Promise<Record<string,string>>})=>{try{return await handler(request,context as RouteContext);}catch(error){if(error instanceof store.HttpError)return NextResponse.json({error:error.message},{status:error.status});if(error instanceof SyntaxError)return NextResponse.json({error:'요청 형식을 확인해주세요.'},{status:400});console.error('[MindLens API]',error instanceof Error?error.message:'Unknown error');return NextResponse.json({error:'요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.'},{status:500});}};}
 export const json=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -42,5 +42,6 @@ export async function screensPost(request:Request,context:RouteContext){const {i
  if(typeof b.html!=='string'||!b.html||b.html.length>MAX_SCREEN_CHARS)throw new store.HttpError(400,`화면 기록은 ${MAX_SCREEN_CHARS.toLocaleString('ko-KR')}자 이하여야 합니다.`);
  if(typeof b.hash!=='string'||!SCREEN_HASH_PATTERN.test(b.hash))throw new store.HttpError(400,'화면 해시 형식이 올바르지 않습니다.');
  if(screenHash(b.html)!==b.hash)throw new store.HttpError(400,'화면 해시가 내용과 일치하지 않습니다.');
+ if(!store.screenExists(screenId(s.studyId,v,b.hash))&&store.countScreens(s.studyId,v)>=MAX_SCREENS_PER_VARIANT)throw new store.HttpError(400,'화면 기록 한도를 넘었습니다.');
  return json(store.saveScreen(s.studyId,v,b.hash,b.html));}
-export async function screenGet(_request:Request,context:RouteContext){const {id}=await context.params;return new Response(prepareSnapshot(store.getScreenHtml(id)),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"sandbox allow-scripts; frame-ancestors 'self'"}});}
+export async function screenGet(_request:Request,context:RouteContext){const {id}=await context.params;return new Response(prepareSnapshot(store.getScreenHtml(id)),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':`sandbox allow-scripts; frame-ancestors 'self'; ${PROTOTYPE_CSP}`}});}

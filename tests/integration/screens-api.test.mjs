@@ -1,6 +1,6 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { screenHash } from '../../src/lib/screen-hash.ts';
+import { screenHash, MAX_SCREENS_PER_VARIANT } from '../../src/lib/screen-hash.ts';
 import { SURVEY_QUESTIONS } from '../../src/lib/types.ts';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:3100';
@@ -59,11 +59,27 @@ test('스냅샷 조회는 시안 스크립트를 빼고 오버레이를 넣어 �
   const r = await fetch(`${BASE}/api/screens/${study.id}_${session.currentVariant}_${hash}`);
   assert.equal(r.status, 200);
   assert.match(r.headers.get('content-type'), /text\/html/);
-  assert.match(r.headers.get('content-security-policy'), /sandbox allow-scripts/);
+  const csp = r.headers.get('content-security-policy');
+  assert.match(csp, /sandbox allow-scripts/);
+  assert.match(csp, /default-src 'none'/);
+  assert.ok(!csp.includes('allow-same-origin'));
   const body = await r.text();
   assert.ok(body.includes('data-mindlens-overlay'));
   assert.ok(!body.includes('<script>1</script>'));
   assert.equal((await fetch(`${BASE}/api/screens/nope`)).status, 404);
+});
+
+test('시안당 화면 수 한도를 넘으면 400, 이미 있는 화면은 200', async () => {
+  const s = (await (await post('/api/demo', { owner: 'cap-test', durationSeconds: 15 })).json()).study;
+  const ses = (await (await post('/api/sessions', { studyId: s.id, name: 'cap' })).json()).session;
+  const put = (h) => post(`/api/sessions/${ses.id}/screens`, { variant: 'A', hash: screenHash(h), html: h });
+  for (let i = 0; i < MAX_SCREENS_PER_VARIANT; i++) assert.equal((await put(`<p>${i}</p>`)).status, 200);
+  const over = await put('<p>over</p>');
+  assert.equal(over.status, 400);
+  assert.match((await over.json()).error, /한도/);
+  const again = await put('<p>0</p>');
+  assert.equal(again.status, 200);
+  assert.equal((await again.json()).created, false);
 });
 
 test('완료한 세션은 화면을 더 저장할 수 없다(409)', async () => {
