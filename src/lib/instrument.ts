@@ -81,7 +81,7 @@ export function clickTracker(pick: typeof pickComponent): void {
     if (commentMode && !modeStyle) {
       modeStyle = document.createElement('style');
       modeStyle.setAttribute('data-mindlens', '');
-      modeStyle.textContent = '*:hover{outline:2px dashed #00A4DF !important;outline-offset:-2px;cursor:crosshair !important}';
+      modeStyle.textContent = '*:hover{outline:2px dashed #00A4DF !important;outline-offset:-2px}';
       (document.head || document.documentElement).appendChild(modeStyle);
     } else if (!commentMode && modeStyle) {
       modeStyle.remove();
