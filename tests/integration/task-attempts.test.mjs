@@ -14,13 +14,15 @@ const post = (p, body) => fetch(BASE + p, { method: 'POST', headers: { 'Content-
 const patch = (p, body) => fetch(BASE + p, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 const PATH = 'body>main:nth-of-type(1)>button:nth-of-type(1)';
-const tasks = [1, 2, 3].map((n) => ({
+const STATE = { anchor: '[data-project-id="PRJ-101"]', path: 'span:nth-of-type(1)', property: 'text', expected: '주의', match: 'equals' };
+const PROOF = '<span data-field="status" class="badge">주의</span>';
+const tasks = [1, 2, 3, 4, 5].map((n) => ({
   id: `t${n}`, instruction: `과업 ${n}`, timeLimitSeconds: 60,
-  criteria: n === 3
-    ? { A: { text: '결제가 완료되었습니다' }, B: { text: '결제가 완료되었습니다' } }
+  criteria: n >= 3
+    ? { A: { state: STATE }, B: { state: STATE } }
     : { A: { componentPath: PATH, componentLabel: '저장' }, B: { componentPath: PATH, componentLabel: '저장' } },
 }));
-const evidenceHtml = '<!DOCTYPE html><html><head><style>.x{}</style></head><body><main><p>결제가 완료되었습니다</p></main></body></html>';
+const evidenceHtml = `<!DOCTYPE html><html><head><style>.x{}</style></head><body><main><table><tr data-project-id="PRJ-101"><td>Orbit</td><td>${PROOF}</td></tr></table></main></body></html>`;
 const plainHtml = '<!DOCTYPE html><html><head></head><body><main><p>아무 화면</p></main></body></html>';
 let study, session, v, evidenceId, plainId;
 
@@ -75,13 +77,33 @@ test('근거 클릭이 없는 성공 주장은 저장되지만 verified=false', 
   assert.equal(a.verified, false);
 });
 
-test('문구 성공: 근거 화면에 문구가 있으면 verified=true', async () => {
-  const ok = await post(`/api/sessions/${session.id}/task-attempts`, { attempts: [attempt({ taskId: 't3', matchedBy: 'text', evidenceScreenId: evidenceId })] });
+test('상태 성공: 근거 화면 + 증명이 맞으면 verified=true 이고 증명이 저장된다', async () => {
+  const ok = await post(`/api/sessions/${session.id}/task-attempts`, { attempts: [attempt({ taskId: 't3', matchedBy: 'state', evidenceScreenId: evidenceId, evidenceProof: PROOF })] });
   assert.deepEqual(await ok.json(), { saved: 1 });
   const a = (await results()).taskAttempts.find((x) => x.taskId === 't3' && x.variant === v);
-  assert.equal(a.matchedBy, 'text');
+  assert.equal(a.matchedBy, 'state');
   assert.equal(a.evidenceScreenId, evidenceId);
+  assert.equal(a.evidenceProof, PROOF);
   assert.equal(a.verified, true);
+});
+
+test('상태 성공 주장이라도 증명이 근거 화면에 없으면 저장은 되지만 verified=false', async () => {
+  const r = await post(`/api/sessions/${session.id}/task-attempts`, { attempts: [attempt({ taskId: 't4', matchedBy: 'state', evidenceScreenId: evidenceId, evidenceProof: '<span data-field="status">조작</span>' })] });
+  assert.deepEqual(await r.json(), { saved: 1 });
+  assert.equal((await results()).taskAttempts.find((x) => x.taskId === 't4' && x.variant === v).verified, false);
+});
+
+test('상태 성공인데 증명 또는 근거 화면이 없으면 verified=false', async () => {
+  const r = await post(`/api/sessions/${session.id}/task-attempts`, { attempts: [attempt({ taskId: 't5', matchedBy: 'state', evidenceScreenId: evidenceId })] });
+  assert.deepEqual(await r.json(), { saved: 1 });
+  assert.equal((await results()).taskAttempts.find((x) => x.taskId === 't5' && x.variant === v).verified, false);
+});
+
+test('옛 matchedBy "text" 와 잘못된 evidenceProof 는 400', async () => {
+  const bad = async (a) => (await post(`/api/sessions/${session.id}/task-attempts`, { attempts: [a] })).status;
+  assert.equal(await bad(attempt({ taskId: 't3', matchedBy: 'text' })), 400);
+  assert.equal(await bad(attempt({ taskId: 't3', matchedBy: 'state', evidenceProof: 5 })), 400);
+  assert.equal(await bad(attempt({ taskId: 't3', matchedBy: 'state', evidenceProof: 'x'.repeat(20001) })), 400);
 });
 
 test('실패 결과(timeout·gave_up)는 matchedBy 없이 저장된다', async () => {

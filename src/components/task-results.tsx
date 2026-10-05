@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import type { ClickEvent, StudyTask, TaskAttempt } from '@/lib/types';
+import type { ClickEvent, StudyTask, TaskAttempt, TaskCriteria } from '@/lib/types';
 import { computeTaskMetrics, type TaskMetric } from '@/lib/task-metrics';
 import { loadScreen } from '@/lib/screen-cache';
+import { stateSummary } from './task-editor';
 import s from './workspace.module.css';
 
 const COLOR = { A: '#00A4DF', B: '#5277a3' } as const;
@@ -30,11 +31,15 @@ function Thumb({ screenId, viewport }: { screenId: string; viewport: { w: number
   );
 }
 
-function VariantColumn({ m, viewportOf, excluded }: { m: TaskMetric; viewportOf: (id: string) => { w: number; h: number }; excluded?: boolean }) {
+function VariantColumn({ m, viewportOf, excluded, criteria, attempts }: { m: TaskMetric; viewportOf: (id: string) => { w: number; h: number }; excluded?: boolean; criteria?: TaskCriteria; attempts: TaskAttempt[] }) {
+  const hits = attempts.filter((a) => a.taskId === m.taskId && a.variant === m.variant && a.outcome === 'success' && a.verified);
+  const byComponent = hits.filter((a) => a.matchedBy === 'component').length;
+  const byState = hits.filter((a) => a.matchedBy === 'state').length;
   const rate = Math.round(m.successRate * 100);
   return (
     <div className={s.recordCard} style={{ minWidth: 0 }}>
       <span className={s.badge}>VERSION {m.variant}</span>
+      {criteria && <p className={s.hint} style={{ marginTop: 8 }}>{[criteria.componentPath ? `컴포넌트: ${criteria.componentLabel || criteria.componentPath}` : '', criteria.state ? `상태: ${stateSummary(criteria.state)}` : ''].filter(Boolean).join(' · ') || '기준 없음'}</p>}
       {m.attempts === 0 ? <p className={s.hint} style={{ marginTop: 10 }}>{excluded ? '버전 필터로 제외됨' : '아직 시도한 참여자가 없습니다.'}</p> : <>
         <div className={s.barRow} style={{ marginTop: 10 }}>
           <span>성공률</span>
@@ -48,6 +53,7 @@ function VariantColumn({ m, viewportOf, excluded }: { m: TaskMetric; viewportOf:
             <tr><td>중앙값 소요 시간</td><td>{sec(m.medianMs)}</td></tr>
             <tr><td>첫 클릭 정확도</td><td>{pct(m.firstClickRate)}</td></tr>
             <tr><td>평균 헛클릭</td><td>{m.avgStaticClicks.toFixed(1)}회</td></tr>
+            <tr><td>완료 방식</td><td>컴포넌트 클릭 {byComponent}명 · 상태 변경 {byState}명</td></tr>
             <tr><td>시간 초과 · 포기</td><td>{m.timeouts}명 · {m.gaveUp}명</td></tr>
           </tbody>
         </table>
@@ -76,7 +82,7 @@ export default function TaskResults({ tasks, attempts, events, variantFilter }: 
           <h3>과업 {i + 1}</h3>
           <p style={{ fontSize: 14, margin: '4px 0 2px' }}>{t.instruction}</p>
           <p className={s.hint}>제한 시간 {t.timeLimitSeconds}초 · 선택한 참여자 기준</p>
-          <div className={s.twoCols}>{metrics.filter((m) => m.taskId === t.id).map((m) => <VariantColumn key={m.variant} m={m} viewportOf={viewportOf} excluded={!!variantFilter && variantFilter !== 'all' && m.variant !== variantFilter} />)}</div>
+          <div className={s.twoCols}>{metrics.filter((m) => m.taskId === t.id).map((m) => <VariantColumn key={m.variant} m={m} criteria={t.criteria[m.variant]} attempts={attempts} viewportOf={viewportOf} excluded={!!variantFilter && variantFilter !== 'all' && m.variant !== variantFilter} />)}</div>
         </section>
       ))}
     </>
