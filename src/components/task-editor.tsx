@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Plus,Trash2,ArrowUp,ArrowDown,X,MousePointerClick} from 'lucide-react';
 import {instrument} from '@/lib/instrument';
-import {TASK_LIMITS} from '@/lib/task-rules';
+import {TASK_LIMITS,stateMatches} from '@/lib/task-rules';
 import type {StateCriterion,StudyTask,TaskCriteria,Variant} from '@/lib/types';
 import s from './workspace.module.css';
 
@@ -15,7 +15,6 @@ export const draftsToPayload=(drafts:TaskDraft[])=>drafts.map(d=>({instruction:d
 const noEnter=(e:React.KeyboardEvent)=>{if(e.key==='Enter')e.preventDefault();};
 const small:React.CSSProperties={display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:'1px solid #E5E7EB',borderRadius:8,background:'#fff',color:'#454545',cursor:'pointer'};
 const ORANGE='#F18134';
-const norm=(v:string)=>v.replace(/\s+/g,'').toLowerCase();
 
 /** 미리보기에서 고른 요소의 현재 속성 값들(상태 기준 후보). 저장되지 않고 설정 화면에서만 쓴다. */
 export type StateProps={text:string;value?:string;checked?:string;attrs:Record<string,string>};
@@ -59,7 +58,7 @@ export default function TaskEditor({htmlA,htmlB,value,onChange}:{htmlA:string|nu
     <p className={s.hint}>참여자는 자유 탐색 뒤 과업을 순서대로 수행합니다. 시안마다 완료 기준(목표 컴포넌트 또는 목표 상태)을 하나 이상 정해주세요. 둘 다 정하면 하나만 맞아도 성공입니다. 목표 상태는 특정 요소의 값이 원하는 값으로 바뀌는 것입니다(예: 프로젝트 상태가 &lsquo;주의&rsquo;가 됨).</p>
     {value.map((x,i)=>{const v=tabs[x.key]||'A';const c=x.criteria[v];const text=html[v];const st=c.state;const info=infos[`${x.key}:${v}`];
       const stReady=!!(st&&st.expected.trim());const none=!c.componentPath&&!stReady;
-      const cur=st?currentOf(info,st):undefined;const same=!!(st&&stReady&&cur!==undefined&&(st.match==='contains'?norm(cur).indexOf(norm(st.expected))>=0:norm(cur)===norm(st.expected)));
+      const cur=st?currentOf(info,st):undefined;const same=!!(st&&stReady&&cur!==undefined&&stateMatches(st,cur));
       return <div key={x.key} style={{border:'1px solid #E5E7EB',borderRadius:12,padding:12,marginTop:10,background:'#fff'}}>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
           <span style={{color:'#00A4DF',fontWeight:600,fontSize:13}}>과업 {i+1}</span><span style={{flex:1}}/>

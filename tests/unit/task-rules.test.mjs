@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTasks, matchTask, htmlToText, verifyAttempt, readState, stateMatches, TASK_LIMITS } from '../../src/lib/task-rules.ts';
+import { parseTasks, matchTask, htmlToText, verifyAttempt, readState, resolveStateElement, stateMatches, TASK_LIMITS } from '../../src/lib/task-rules.ts';
 
 const st = (o = {}) => ({ anchor: '[data-project-id="PRJ-101"]', path: 'span:nth-of-type(1)', property: 'text', expected: '주의', match: 'equals', ...o });
 const crit = (o = {}) => ({ A: { state: st() }, B: { state: st() }, ...o });
@@ -122,7 +122,7 @@ test('readState: text / value / checked / attr, 앵커 없으면 body, 없으면
 });
 
 test('readState / stateMatches 는 toString() 으로 직렬화해도 같은 결과', () => {
-  const rs = new Function(`return (${readState.toString()})`)();
+  const rs = new Function(`${resolveStateElement.toString()}; return (${readState.toString()})`)();
   const sm = new Function(`return (${stateMatches.toString()})`)();
   const doc = { body: {}, querySelectorAll: () => [{ ...fakeEl({ innerText: ' 주의 ' }), querySelector: () => fakeEl({ innerText: '주의' }) }] };
   assert.equal(rs(st(), doc), readState(st(), doc));
@@ -210,4 +210,31 @@ test('anchorIndex: 같은 선택자가 여러 요소와 맞을 때 고른 요소
   assert.equal(bad(3)[0].criteria.A.state.anchorIndex, 3);
   assert.equal(bad(0)[0].criteria.A.state.anchorIndex, undefined);
   for (const v of [-1, 201, 1.5, '1']) assert.throws(() => bad(v), /목표 상태/);
+});
+
+test('resolveStateElement: 앵커 순번·path·body 폴백, 직렬화 사본도 같다', () => {
+  const child = { tag: 'child' };
+  const mk = (tag) => ({ tag, querySelector: (sel) => (sel === ':scope > span:nth-of-type(1)' ? child : null) });
+  const doc = { body: mk('body'), querySelectorAll: (sel) => (sel === '[data-id="X"]' ? [mk('a0'), mk('a1')] : []) };
+  const rse = new Function(`return (${resolveStateElement.toString()})`)();
+  for (const fn of [resolveStateElement, rse]) {
+    assert.equal(fn(st({ anchor: '[data-id="X"]', anchorIndex: 1, path: '' }), doc).tag, 'a1');
+    assert.equal(fn(st({ anchor: '[data-id="X"]', path: '' }), doc).tag, 'a0');
+    assert.equal(fn(st({ anchor: '[data-id="X"]', anchorIndex: 1, path: 'span:nth-of-type(1)' }), doc), child);
+    assert.equal(fn(st({ anchor: '[data-id="X"]', anchorIndex: 2, path: '' }), doc), null);
+    assert.equal(fn(st({ anchor: '[nope]', path: '' }), doc), null);
+    assert.equal(fn(st({ anchor: undefined, path: '' }), doc).tag, 'body');
+  }
+});
+
+test('verifyAttempt(state): 숫자로 시작하는 id(16진수 이스케이프)·따옴표/역슬래시 값의 앵커', () => {
+  const mk = (anchor) => parseTasks([{ instruction: 'a', criteria: { A: { state: st({ anchor, path: '', property: 'text', expected: '주의' }) }, B: { state: st() } } }])[0];
+  const run = (anchor, html) => verifyAttempt(mk(anchor), 'A', { outcome: 'success', matchedBy: 'state' }, [], html, '<span>주의</span>');
+  // CSS.escape('123') === '\\31 23'
+  assert.equal(run('#\\31 23', '<div id="123"><span>주의</span></div>'), true);
+  assert.equal(run('#\\31 23', '<div id="999"><span>주의</span></div>'), false);
+  assert.equal(run('[id="123"]', '<div id="123"><span>주의</span></div>'), true);
+  assert.equal(run('[data-key="a\\"b"]', '<div data-key="a&quot;b"><span>주의</span></div>'), true);
+  assert.equal(run('[data-key="a\\\\b"]', '<div data-key="a\\b"><span>주의</span></div>'), true);
+  assert.equal(run('#a\\.b', '<div id="a.b"><span>주의</span></div>'), true);
 });

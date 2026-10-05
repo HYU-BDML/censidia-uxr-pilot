@@ -1,5 +1,5 @@
 import { pickComponent } from './component-pick';
-import { matchTask, readState, stateMatches } from './task-rules';
+import { matchTask, readState, resolveStateElement, stateMatches } from './task-rules';
 import type { TaskCriteria } from './types';
 import { PROTOTYPE_CSP } from './snapshot';
 
@@ -28,7 +28,7 @@ export type PrototypeClick = {
  * iframe 안에서 실행된다. toString() 으로 주입되므로 함수 밖 값을 참조하지 않고,
  * 컴포넌트 판정 함수는 인자로 받는다(같은 로직이 두 벌 생기지 않게).
  */
-export function clickTracker(pick: typeof pickComponent, match: typeof matchTask, read: typeof readState, stateOk: typeof stateMatches): void {
+export function clickTracker(pick: typeof pickComponent, match: typeof matchTask, read: typeof readState, stateOk: typeof stateMatches, resolve: typeof resolveStateElement): void {
   const LISTENED = new WeakSet<Element>();
   const TYPES: Record<string, true> = { click: true, pointerdown: true, pointerup: true, mousedown: true, mouseup: true, touchstart: true, touchend: true };
   const original = EventTarget.prototype.addEventListener;
@@ -103,7 +103,11 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
   // 상태 기준 후보: 가장 가까운 안정 앵커(id 또는 data-*-id 류)와 그 아래 nth-of-type 경로.
   const ANCHOR_ATTR = /^data-(project-id|task-id|member-id|notification-id|setting|id|key)$|^data-.+-id$/;
   function anchorSelector(node: Element): string | null {
-    if (node.id && document.querySelectorAll('#' + CSS.escape(node.id)).length === 1) return '#' + CSS.escape(node.id);
+    // 값은 항상 따옴표 속성 선택자로 만든다(`\"`·`\\` 이스케이프만) — CSS.escape 의 16진수 이스케이프를 쓰지 않는다.
+    if (node.id) {
+      const idSel = '[id="' + node.id.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+      if (document.querySelectorAll(idSel).length === 1) return idSel;
+    }
     for (let i = 0; i < node.attributes.length; i++) {
       const at = node.attributes[i];
       if (ANCHOR_ATTR.test(at.name) && at.value) return '[' + at.name + '="' + at.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
@@ -201,8 +205,7 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
     if (!st || !stateOk(st, read(st, document))) return;
     let proof = '';
     try {
-      const root: Element | null = st.anchor ? document.querySelectorAll(st.anchor)[st.anchorIndex || 0] || null : document.body;
-      const el = root && st.path ? root.querySelector(':scope > ' + st.path) : root;
+      const el = resolve(st, document);
       if (el) {
         const copy = el.cloneNode(true) as Element;
         mirror(el, copy);
@@ -270,7 +273,7 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
 
 export function instrument(html: string): string {
   const meta = `<meta data-mindlens http-equiv="Content-Security-Policy" content="${PROTOTYPE_CSP}">`;
-  const script = `<script data-mindlens>(${clickTracker.toString()})(${pickComponent.toString()},${matchTask.toString()},${readState.toString()},${stateMatches.toString()})</script>`;
+  const script = `<script data-mindlens>${resolveStateElement.toString()};(${clickTracker.toString()})(${pickComponent.toString()},${matchTask.toString()},${readState.toString()},${stateMatches.toString()},${resolveStateElement.toString()})</script>`;
   const headRe = /<head(?:\s[^>]*)?>/i;
   return headRe.test(html) ? html.replace(headRe, (head) => head + meta + script) : meta + script + html;
 }

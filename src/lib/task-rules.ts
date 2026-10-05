@@ -41,14 +41,23 @@ export function matchTask(criteria: TaskCriteria | null | undefined, hit: TaskHi
 }
 
 /**
+ * 목표 상태의 요소를 찾는다(앵커의 anchorIndex 번째 → path). 없으면 null. 잘못된 선택자는 예외를 던진다.
+ * 요소 해석의 유일한 구현 — readState 와 iframe 의 증명 추출이 같이 쓴다.
+ * toString 직렬화 가능. readState 가 이 함수를 이름으로 부르므로, 직렬화해 주입할 때 함께(같은 이름으로) 주입해야 한다.
+ */
+export function resolveStateElement(state: StateCriterion, doc: Document): Element | null {
+  const root: Element | null = state.anchor ? doc.querySelectorAll(state.anchor)[state.anchorIndex || 0] || null : doc.body;
+  if (!root) return null;
+  return state.path ? root.querySelector(':scope > ' + state.path) : root;
+}
+
+/**
  * 참가자 iframe 에서 목표 상태의 현재 값을 읽는다(없으면 null). toString 직렬화 가능.
  * 앵커(없으면 body) 아래에서 path 의 요소를 찾아 property 로 읽는다.
  */
 export function readState(state: StateCriterion, doc: Document): string | null {
   try {
-    const root: Element | null = state.anchor ? doc.querySelectorAll(state.anchor)[state.anchorIndex || 0] || null : doc.body;
-    if (!root) return null;
-    const el: Element | null = state.path ? root.querySelector(':scope > ' + state.path) : root;
+    const el = resolveStateElement(state, doc);
     if (!el) return null;
     const any = el as unknown as { innerText?: string; textContent?: string | null; value?: unknown; checked?: unknown };
     if (state.property === 'text') return String(any.innerText !== undefined && any.innerText !== null ? any.innerText : any.textContent || '');
@@ -151,12 +160,15 @@ export function htmlToText(html: string): string {
     .replace(/&amp;/gi, '&');
 }
 
-const unescapeCss = (v: string) => v.replace(/\\(.)/g, '$1');
+/** CSS 이스케이프 해제: 16진수(`\31 23` — 뒤의 공백 1개 포함)와 문자(`\x`) 이스케이프 모두. */
+const unescapeCss = (v: string) =>
+  v.replace(/\\([0-9a-fA-F]{1,6})[ \t\n\r\f]?|\\([\s\S])/g, (_m, hex: string | undefined, ch: string | undefined) =>
+    hex ? String.fromCodePoint(Math.min(parseInt(hex, 16) || 0xfffd, 0x10ffff)) : (ch as string));
 const escapeHtmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
 /** 앵커 선택자(#id 또는 [attr="value"])를 HTML 에서 찾을 문자열(id="…" / attr="…")로 바꾼다. 못 읽으면 null. */
 function anchorNeedle(anchor: string): string | null {
-  const id = /^#((?:[^\\\s]|\\.)+)$/.exec(anchor);
+  const id = /^#((?:[^\\]|\\[0-9a-fA-F]{1,6}[ \t\n\r\f]?|\\[\s\S])+)$/.exec(anchor);
   if (id) return `id="${escapeHtmlAttr(unescapeCss(id[1]))}"`;
   const attr = /^\[([a-zA-Z_:][-a-zA-Z0-9_:.]*)="((?:[^"\\]|\\.)*)"\]$/.exec(anchor);
   if (attr) return `${attr[1]}="${escapeHtmlAttr(unescapeCss(attr[2]))}"`;
