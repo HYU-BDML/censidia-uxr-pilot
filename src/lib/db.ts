@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { screenId } from './screen-hash';
 import { SURVEY_QUESTIONS, type Study, type Session, type SessionDetail, type StudyResults, type Variant, type ClickEvent, type StoredAnswer, type InterviewTurn, type Recording, type SurveyAnswer } from './types';
 
 const dataDir = path.resolve(/* turbopackIgnore: true */ process.env.MINDLENS_DATA_DIR || path.join(process.cwd(), 'data'));
@@ -20,7 +21,9 @@ export function db() {
       CREATE TABLE IF NOT EXISTS turns (id INTEGER PRIMARY KEY AUTOINCREMENT, sessionId TEXT NOT NULL REFERENCES sessions(id), payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS recordings (id TEXT PRIMARY KEY, sessionId TEXT NOT NULL REFERENCES sessions(id), payload TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS events_session ON events(sessionId);
-      CREATE INDEX IF NOT EXISTS turns_session ON turns(sessionId);`);
+      CREATE INDEX IF NOT EXISTS turns_session ON turns(sessionId);
+      CREATE TABLE IF NOT EXISTS screens (id TEXT PRIMARY KEY, studyId TEXT NOT NULL REFERENCES studies(id), variant TEXT NOT NULL, hash TEXT NOT NULL, html TEXT NOT NULL, createdAt TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS screens_study ON screens(studyId, variant);`);
   }
   return singleton;
 }
@@ -47,6 +50,9 @@ export function addEvents(sessionId:string,events:ClickEvent[]) {return transact
 export function saveAnswers(sessionId:string,variant:Variant,answers:SurveyAnswer[]) {return transaction(()=>{for(const answer of answers)db().prepare('INSERT INTO answers(sessionId,variant,questionId,payload) VALUES (?,?,?,?) ON CONFLICT(sessionId,variant,questionId) DO UPDATE SET payload=excluded.payload').run(sessionId,variant,answer.questionId,JSON.stringify({...answer,sessionId,variant,createdAt:new Date().toISOString()}));return answers.length;});}
 export function addTurn(sessionId:string,variant:Variant,role:'user'|'assistant',text:string,elapsedSeconds:number,mode:'ai'|'demo') {const turn={sessionId,variant,role,text,elapsedSeconds,mode,createdAt:new Date().toISOString()};const insert=db().prepare('INSERT INTO turns(sessionId,payload) VALUES (?,?)').run(sessionId,JSON.stringify(turn));return {...turn,id:Number(insert.lastInsertRowid)};}
 export async function addRecording(sessionId:string,variant:Variant,file:File,durationSeconds:number):Promise<Recording>{const recording:Recording={id:randomUUID(),sessionId,variant,mimeType:file.type||'audio/webm',durationSeconds,createdAt:new Date().toISOString()};writeFileSync(path.join(recordingDir,recording.id),Buffer.from(await file.arrayBuffer()));db().prepare('INSERT INTO recordings VALUES (?,?,?)').run(recording.id,sessionId,JSON.stringify(recording));return recording;}
+export function saveScreen(studyId:string,variant:Variant,hash:string,html:string):{id:string;created:boolean}{const id=screenId(studyId,variant,hash);const result=db().prepare('INSERT INTO screens(id,studyId,variant,hash,html,createdAt) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(id,studyId,variant,hash,html,new Date().toISOString());return {id,created:Number(result.changes)>0};}
+export function screenExists(id:string):boolean{return !!db().prepare('SELECT 1 FROM screens WHERE id=?').get(id);}
+export function getScreenHtml(id:string):string{return (required(db().prepare('SELECT html FROM screens WHERE id=?').get(id),'화면을 찾을 수 없습니다.') as {html:string}).html;}
 export function getRecording(id:string){return required(parse<Recording>(db().prepare('SELECT payload FROM recordings WHERE id=?').get(id)));}
 export function readRecording(id:string){const recording=getRecording(id);return {recording,bytes:readFileSync(path.join(recordingDir,recording.id))};}
 export function seedDemo(owner:string,durationSeconds:number) {
