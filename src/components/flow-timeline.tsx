@@ -140,7 +140,7 @@ export default function FlowTimeline({ events, sessionName }: { events: ClickEve
                         <div style={{ fontSize: 16, lineHeight: 1 }}>→</div>
                       </div>
                     )}
-                    <div role="button" tabIndex={0} onClick={() => setOpen({ step, who })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen({ step, who }); } }} title="크게 보기" style={{ width: CARD_W, flex: 'none', cursor: 'zoom-in', border: '1px solid #E5E7EB', borderRadius: 10, padding: 8, background: '#fff' }}>
+                    <div role="button" tabIndex={0} onClick={() => setOpen({ step, who })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen({ step, who }); } }} title="크게 보기" style={{ width: CARD_W, flex: 'none', cursor: 'zoom-in', textAlign: 'left', border: '1px solid #E5E7EB', borderRadius: 10, padding: 8, background: '#fff' }}>
                       <Snapshot step={step} width={CARD_W - 18} maxHeight={CARD_PREVIEW_MAX_H} lazy />
                       <div style={{ fontSize: 12, fontWeight: 600, marginTop: 8, color: '#0D0D0D' }}>{fmt(step.startMs)} – {fmt(step.endMs)}</div>
                       <ClickList step={step} />
