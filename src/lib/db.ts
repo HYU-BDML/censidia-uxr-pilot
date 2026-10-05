@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { screenId } from './screen-hash';
-import { SURVEY_QUESTIONS, type Study, type Session, type SessionDetail, type StudyResults, type Variant, type ClickEvent, type StoredAnswer, type InterviewTurn, type Recording, type SurveyAnswer, type ParticipantComment } from './types';
+import { SURVEY_QUESTIONS, type Study, type Session, type SessionDetail, type StudyResults, type Variant, type ClickEvent, type StoredAnswer, type InterviewTurn, type Recording, type SurveyAnswer, type ParticipantComment, type TaskAttempt } from './types';
 
 const dataDir = path.resolve(/* turbopackIgnore: true */ process.env.MINDLENS_DATA_DIR || path.join(process.cwd(), 'data'));
 export const recordingDir = path.join(dataDir, 'recordings');
@@ -25,6 +25,7 @@ export function db() {
       CREATE TABLE IF NOT EXISTS screens (id TEXT PRIMARY KEY, studyId TEXT NOT NULL REFERENCES studies(id), variant TEXT NOT NULL, hash TEXT NOT NULL, html TEXT NOT NULL, createdAt TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS screens_study ON screens(studyId, variant);
       CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, sessionId TEXT NOT NULL REFERENCES sessions(id), payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS task_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, sessionId TEXT NOT NULL REFERENCES sessions(id), taskId TEXT NOT NULL, variant TEXT NOT NULL, payload TEXT NOT NULL, UNIQUE(sessionId,taskId,variant));
       CREATE INDEX IF NOT EXISTS comments_session ON comments(sessionId);`);
   }
   return singleton;
@@ -32,7 +33,7 @@ export function db() {
 export function transaction<T>(fn:()=>T):T {const d=db();d.exec('BEGIN IMMEDIATE');try {const value=fn();d.exec('COMMIT');return value;}catch(e){d.exec('ROLLBACK');throw e;}}
 type Row = {payload:string;id:string|number};
 function parse<T>(row:unknown):T|undefined {return row ? JSON.parse((row as Row).payload) as T : undefined;}
-function list<T>(table:'sessions'|'events'|'answers'|'turns'|'recordings'|'comments',sessionIds:string[]):T[] {
+function list<T>(table:'sessions'|'events'|'answers'|'turns'|'recordings'|'comments'|'task_attempts',sessionIds:string[]):T[] {
   if(!sessionIds.length)return [];
   return db().prepare(`SELECT id,payload FROM ${table} WHERE ${table==='sessions'?'id':'sessionId'} IN (${sessionIds.map(()=>'?').join(',')}) ORDER BY rowid`).all(...sessionIds).map(r=>({...JSON.parse((r as Row).payload),id:(r as Row).id})) as T[];
 }
@@ -47,7 +48,7 @@ export function getSession(id:string):Session {return required(parse<Session>(db
 export function saveSession(s:Session):Session {db().prepare('UPDATE sessions SET payload=? WHERE id=?').run(JSON.stringify(s),s.id);return s;}
 export function createSession(studyId:string,name:string):Session {return transaction(()=>{const study=getStudy(studyId);const order:Variant[]=studySessions(studyId).length%2?['B','A']:['A','B'];const session:Session={id:randomUUID(),studyId,name,status:'active',currentVariant:order[0],order,startedAt:new Date().toISOString(),completedAt:null,elapsedA:0,elapsedB:0,preference:null,preferenceReason:'',isDemo:false};db().prepare('INSERT INTO sessions VALUES (?,?,?)').run(session.id,studyId,JSON.stringify(session));return session;});}
 export function detail(id:string):SessionDetail {const session=getSession(id);return {session,study:getStudy(session.studyId),events:list<ClickEvent>('events',[id]),answers:list<StoredAnswer>('answers',[id]),interviewTurns:list<InterviewTurn>('turns',[id]),recordings:list<Recording>('recordings',[id])};}
-export function results(id:string):StudyResults {const study=getStudy(id),sessions=studySessions(id),ids=sessions.map(s=>s.id),events=list<ClickEvent>('events',ids);const completed=sessions.filter(s=>s.status==='completed');return {study,sessions,events,answers:list<StoredAnswer>('answers',ids),interviewTurns:list<InterviewTurn>('turns',ids),recordings:list<Recording>('recordings',ids),comments:list<ParticipantComment>('comments',ids),summary:{total:sessions.length,completed:completed.length,preferenceA:completed.filter(s=>s.preference==='A').length,preferenceB:completed.filter(s=>s.preference==='B').length,preferenceTie:completed.filter(s=>s.preference==='tie').length,totalClicks:events.length,avgDurationSeconds:completed.length?Math.round(completed.reduce((a,s)=>a+s.elapsedA+s.elapsedB,0)/completed.length):0}};}
+export function results(id:string):StudyResults {const study=getStudy(id),sessions=studySessions(id),ids=sessions.map(s=>s.id),events=list<ClickEvent>('events',ids);const completed=sessions.filter(s=>s.status==='completed');return {study,sessions,events,answers:list<StoredAnswer>('answers',ids),interviewTurns:list<InterviewTurn>('turns',ids),recordings:list<Recording>('recordings',ids),comments:list<ParticipantComment>('comments',ids),taskAttempts:list<TaskAttempt>('task_attempts',ids),summary:{total:sessions.length,completed:completed.length,preferenceA:completed.filter(s=>s.preference==='A').length,preferenceB:completed.filter(s=>s.preference==='B').length,preferenceTie:completed.filter(s=>s.preference==='tie').length,totalClicks:events.length,avgDurationSeconds:completed.length?Math.round(completed.reduce((a,s)=>a+s.elapsedA+s.elapsedB,0)/completed.length):0}};}
 export function addEvents(sessionId:string,events:ClickEvent[]) {return transaction(()=>{const statement=db().prepare('INSERT INTO events(sessionId,payload) VALUES (?,?)');for(const event of events)statement.run(sessionId,JSON.stringify({...event,sessionId,createdAt:new Date().toISOString()}));return events.length;});}
 export function saveAnswers(sessionId:string,variant:Variant,answers:SurveyAnswer[]) {return transaction(()=>{for(const answer of answers)db().prepare('INSERT INTO answers(sessionId,variant,questionId,payload) VALUES (?,?,?,?) ON CONFLICT(sessionId,variant,questionId) DO UPDATE SET payload=excluded.payload').run(sessionId,variant,answer.questionId,JSON.stringify({...answer,sessionId,variant,createdAt:new Date().toISOString()}));return answers.length;});}
 export function addTurn(sessionId:string,variant:Variant,role:'user'|'assistant',text:string,elapsedSeconds:number,mode:'ai'|'demo') {const turn={sessionId,variant,role,text,elapsedSeconds,mode,createdAt:new Date().toISOString()};const insert=db().prepare('INSERT INTO turns(sessionId,payload) VALUES (?,?)').run(sessionId,JSON.stringify(turn));return {...turn,id:Number(insert.lastInsertRowid)};}
@@ -66,3 +67,5 @@ export function seedDemo(owner:string,durationSeconds:number):{study:Study;creat
  return {study,created:true};
 }
 export function addComments(sessionId:string,comments:ParticipantComment[]) {return transaction(()=>{const statement=db().prepare('INSERT INTO comments(sessionId,payload) VALUES (?,?)');for(const c of comments)statement.run(sessionId,JSON.stringify({...c,sessionId,createdAt:new Date().toISOString()}));return comments.length;});}
+// 과업 시도 저장 — (세션, 과업, 시안) 당 1행. 같은 시도를 다시 보내면 덮지 않고 무시한다(재전송 멱등).
+export function addTaskAttempts(sessionId:string,attempts:TaskAttempt[]):number {return transaction(()=>{const statement=db().prepare('INSERT INTO task_attempts(sessionId,taskId,variant,payload) VALUES (?,?,?,?) ON CONFLICT(sessionId,taskId,variant) DO NOTHING');let saved=0;for(const a of attempts)saved+=Number(statement.run(sessionId,a.taskId,a.variant,JSON.stringify({...a,sessionId,createdAt:new Date().toISOString()})).changes);return saved;});}
