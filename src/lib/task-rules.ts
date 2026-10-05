@@ -42,8 +42,8 @@ export function matchTask(criteria: TaskCriteria | null | undefined, hit: TaskHi
 
 /**
  * 목표 상태의 요소를 찾는다(앵커의 anchorIndex 번째 → path). 없으면 null. 잘못된 선택자는 예외를 던진다.
- * 요소 해석의 유일한 구현 — readState 와 iframe 의 증명 추출이 같이 쓴다.
- * toString 직렬화 가능. readState 가 이 함수를 이름으로 부르므로, 직렬화해 주입할 때 함께(같은 이름으로) 주입해야 한다.
+ * 요소 해석의 유일한 구현 — readState 와 iframe(인자로 주입)이 같이 쓴다.
+ * toString 직렬화 가능 — 다른 모듈 수준 식별자를 참조하지 않는다.
  */
 export function resolveStateElement(state: StateCriterion, doc: Document): Element | null {
   const root: Element | null = state.anchor ? doc.querySelectorAll(state.anchor)[state.anchorIndex || 0] || null : doc.body;
@@ -52,18 +52,28 @@ export function resolveStateElement(state: StateCriterion, doc: Document): Eleme
 }
 
 /**
- * 참가자 iframe 에서 목표 상태의 현재 값을 읽는다(없으면 null). toString 직렬화 가능.
- * 앵커(없으면 body) 아래에서 path 의 요소를 찾아 property 로 읽는다.
+ * 요소에서 state.property 의 값을 읽는다(없으면 null). toString 직렬화 가능 — 다른 함수를 부르지 않는다.
  */
-export function readState(state: StateCriterion, doc: Document): string | null {
+export function readElementState(el: Element, state: StateCriterion): string | null {
   try {
-    const el = resolveStateElement(state, doc);
-    if (!el) return null;
     const any = el as unknown as { innerText?: string; textContent?: string | null; value?: unknown; checked?: unknown };
     if (state.property === 'text') return String(any.innerText !== undefined && any.innerText !== null ? any.innerText : any.textContent || '');
     if (state.property === 'value') return any.value !== undefined && any.value !== null ? String(any.value) : el.getAttribute('value');
     if (state.property === 'checked') return any.checked !== undefined ? String(!!any.checked) : String(el.hasAttribute('checked'));
     return state.attr ? el.getAttribute(state.attr) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 목표 상태의 현재 값(없으면 null). **직렬화하지 않는 조합 헬퍼**(서버·편집기·테스트용).
+ * iframe 은 resolveStateElement 와 readElementState 를 각각 인자로 받아 직접 부른다.
+ */
+export function readState(state: StateCriterion, doc: Document): string | null {
+  try {
+    const el = resolveStateElement(state, doc);
+    return el ? readElementState(el, state) : null;
   } catch (e) {
     return null;
   }

@@ -1,5 +1,5 @@
 import { pickComponent } from './component-pick';
-import { matchTask, readState, resolveStateElement, stateMatches } from './task-rules';
+import { matchTask, readElementState, resolveStateElement, stateMatches } from './task-rules';
 import type { TaskCriteria } from './types';
 import { PROTOTYPE_CSP } from './snapshot';
 
@@ -28,7 +28,7 @@ export type PrototypeClick = {
  * iframe 안에서 실행된다. toString() 으로 주입되므로 함수 밖 값을 참조하지 않고,
  * 컴포넌트 판정 함수는 인자로 받는다(같은 로직이 두 벌 생기지 않게).
  */
-export function clickTracker(pick: typeof pickComponent, match: typeof matchTask, read: typeof readState, stateOk: typeof stateMatches, resolve: typeof resolveStateElement): void {
+export function clickTracker(pick: typeof pickComponent, match: typeof matchTask, readEl: typeof readElementState, stateOk: typeof stateMatches, resolve: typeof resolveStateElement): void {
   const LISTENED = new WeakSet<Element>();
   const TYPES: Record<string, true> = { click: true, pointerdown: true, pointerup: true, mousedown: true, mouseup: true, touchstart: true, touchend: true };
   const original = EventTarget.prototype.addEventListener;
@@ -202,16 +202,15 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
   }
   function checkState(): void {
     const st = criteria && criteria.state;
-    if (!st || !stateOk(st, read(st, document))) return;
+    if (!st) return;
     let proof = '';
     try {
       const el = resolve(st, document);
-      if (el) {
-        const copy = el.cloneNode(true) as Element;
-        mirror(el, copy);
-        proof = copy.outerHTML.slice(0, 20000);
-      }
-    } catch (e) { proof = ''; }
+      if (!el || !stateOk(st, readEl(el, st))) return;
+      const copy = el.cloneNode(true) as Element;
+      mirror(el, copy);
+      proof = copy.outerHTML.slice(0, 20000);
+    } catch (e) { return; }
     clearTask();
     parent.postMessage({ type: 'mindlens-task-hit', by: 'state', html: snapshot(), proof }, '*');
   }
@@ -273,7 +272,7 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
 
 export function instrument(html: string): string {
   const meta = `<meta data-mindlens http-equiv="Content-Security-Policy" content="${PROTOTYPE_CSP}">`;
-  const script = `<script data-mindlens>${resolveStateElement.toString()};(${clickTracker.toString()})(${pickComponent.toString()},${matchTask.toString()},${readState.toString()},${stateMatches.toString()},${resolveStateElement.toString()})</script>`;
+  const script = `<script data-mindlens>(${clickTracker.toString()})(${pickComponent.toString()},${matchTask.toString()},${readElementState.toString()},${stateMatches.toString()},${resolveStateElement.toString()})</script>`;
   const headRe = /<head(?:\s[^>]*)?>/i;
   return headRe.test(html) ? html.replace(headRe, (head) => head + meta + script) : meta + script + html;
 }

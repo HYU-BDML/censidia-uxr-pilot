@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTasks, matchTask, htmlToText, verifyAttempt, readState, resolveStateElement, stateMatches, TASK_LIMITS } from '../../src/lib/task-rules.ts';
+import { parseTasks, matchTask, htmlToText, verifyAttempt, readState, readElementState, resolveStateElement, stateMatches, TASK_LIMITS } from '../../src/lib/task-rules.ts';
 
 const st = (o = {}) => ({ anchor: '[data-project-id="PRJ-101"]', path: 'span:nth-of-type(1)', property: 'text', expected: '주의', match: 'equals', ...o });
 const crit = (o = {}) => ({ A: { state: st() }, B: { state: st() }, ...o });
@@ -121,12 +121,36 @@ test('readState: text / value / checked / attr, 앵커 없으면 body, 없으면
   assert.equal(readState(st(), throwing), null);
 });
 
-test('readState / stateMatches 는 toString() 으로 직렬화해도 같은 결과', () => {
-  const rs = new Function(`${resolveStateElement.toString()}; return (${readState.toString()})`)();
-  const sm = new Function(`return (${stateMatches.toString()})`)();
-  const doc = { body: {}, querySelectorAll: () => [{ ...fakeEl({ innerText: ' 주의 ' }), querySelector: () => fakeEl({ innerText: '주의' }) }] };
-  assert.equal(rs(st(), doc), readState(st(), doc));
-  assert.equal(sm(st(), '주 의'), stateMatches(st(), '주 의'));
+test('직렬화 함수는 전역 없이 단독으로 되살려도 동작한다(다른 모듈 식별자를 참조하지 않는다)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { pickComponent } = await import('../../src/lib/component-pick.ts');
+  const revive = (fn) => new Function('return (' + fn.toString() + ')')();
+  const doc = { body: {}, querySelectorAll: () => [{ ...fakeEl({}), querySelector: () => fakeEl({ innerText: ' 주의 ', value: 'warning', checked: true, attrs: { 'data-s': 'w' } }) }] };
+  // 전역(globalThis)에 같은 이름이 없음을 보장
+  for (const name of ['resolveStateElement', 'readElementState', 'readState', 'stateMatches', 'matchTask', 'pickComponent']) assert.equal(typeof globalThis[name], 'undefined');
+  const resolve = revive(resolveStateElement);
+  const readEl = revive(readElementState);
+  const sm = revive(stateMatches);
+  const mt = revive(matchTask);
+  const pc = revive(pickComponent);
+  const el = resolve(st(), doc);
+  assert.ok(el);
+  assert.equal(readEl(el, st()), ' 주의 ');
+  assert.equal(readEl(el, st({ property: 'value' })), 'warning');
+  assert.equal(readEl(el, st({ property: 'checked' })), 'true');
+  assert.equal(readEl(el, st({ property: 'attr', attr: 'data-s' })), 'w');
+  assert.equal(sm(st(), readEl(el, st())), true);
+  assert.equal(sm(st({ expected: 'x' }), '주의'), false);
+  assert.equal(mt({ componentPath: 'a' }, { componentPath: 'a' }), 'component');
+  assert.deepEqual(pc([{ interactive: true, explicit: false, area: 100, descendants: 0 }], 1000 * 800), { index: 0, kind: 'interactive' });
+  assert.equal(readState(st(), doc), ' 주의 ');
+  // clickTracker 본문은 소스에서 검사한다(Node 에서 import 불가): 인자 이름 외의 모듈 수준 함수를 부르지 않는다.
+  const src = readFileSync(new URL('../../src/lib/instrument.ts', import.meta.url), 'utf8');
+  const start = src.indexOf('export function clickTracker');
+  const body = src.slice(start, src.indexOf('export function instrument'));
+  for (const name of ['readState', 'readElementState', 'resolveStateElement', 'stateMatches', 'matchTask', 'pickComponent']) assert.equal(new RegExp('\\b' + name + '\\b').test(body.replace(/typeof \w+/g, '')), false, name + ' 를 clickTracker 가 직접 참조한다');
+  const inst = src.slice(src.indexOf('export function instrument'));
+  assert.equal(/\$\{resolveStateElement\.toString\(\)\};\(/.test(inst), false, '전역 resolveStateElement 주입이 남아 있다');
 });
 
 const ANCHOR = '[data-project-id="PRJ-101"]';
