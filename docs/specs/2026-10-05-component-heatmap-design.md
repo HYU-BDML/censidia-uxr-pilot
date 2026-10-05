@@ -52,21 +52,27 @@
 
 - `a[href]`, `button`, `input`(hidden 제외), `select`, `textarea`, `label`, `summary`
 - `role` 이 `button|link|tab|menuitem|checkbox|radio|switch|option` 중 하나
-- `[onclick]` 속성, `tabindex` 가 0 이상
+- `[onclick]` 속성 또는 `el.onclick` 프로퍼티 할당, `tabindex` 가 0 이상
 - 3-2 에서 표시된 요소
+- 계산된 `cursor: pointer` 이면서 부모는 `pointer` 가 아닌 요소 — 위임 리스너로만 동작하는
+  `tr.project-row` 같은 행을 잡는다. `cursor` 는 상속되므로 "포인터 영역의 꼭대기"만 센다.
 - `[data-component]` (의뢰자가 명시한 경계)
 
 ### 3-4. 컴포넌트 결정
 
 1. 클릭 대상에서 `<body>` 직전까지 조상을 올라가며 상호작용 요소를 모은다.
-2. **컨테이너 제외**: 요소 면적이 뷰포트 면적의 60% 이상이면 후보에서 뺀다
-   (이벤트 위임용 `#app` 래퍼가 모든 클릭을 삼키는 것을 막는다).
+2. **컨테이너 제외** — 아래 중 하나면 후보에서 뺀다.
+   - 면적이 뷰포트 면적의 60% 이상(이벤트 위임용 `#app` 래퍼).
+   - 안에 상호작용 요소가 **2개 이상**(데모 A안의 `#rangeControls`·`#createDialog` 처럼 리스너를 단
+     묶음 컨테이너). 카드 안에 버튼이 1개뿐이면 제외하지 않으므로 카드로 합산된다.
+   - 단, `[data-component]` 로 명시된 요소는 이 두 규칙과 관계없이 항상 후보다.
 3. 남은 후보 중 **가장 바깥쪽**을 컴포넌트로 하고 `kind = 'interactive'`.
 4. 후보가 없으면 클릭 대상 자체를 컴포넌트로 하고 `kind = 'static'`.
    대상이 `<body>`·`<html>` 이면 `kind = 'static'`, 경로는 `body`.
 
 이 결정 로직은 DOM 에 의존하지 않는 순수 함수로 분리한다. 입력은 조상 목록
-(각 항목: 상호작용 여부, 면적)과 뷰포트 면적이고, 출력은 선택된 인덱스와 `kind` 다.
+(각 항목: 상호작용 여부, 명시 여부, 면적, 내부 상호작용 요소 수)과 뷰포트 면적이고,
+출력은 선택된 인덱스와 `kind` 다.
 주입 스크립트는 이 함수를 문자열로 직렬화해 넣는다 — 같은 로직이 두 벌 생기지 않게 한다.
 
 ### 3-5. 경로
@@ -82,15 +88,22 @@
 
 - 직렬화: `document.documentElement.outerHTML`. 주입한 `<meta>`·`<script>` 는 `data-mindlens`
   속성으로 표시해 두고 직렬화 결과에서 제거한다.
-- `postMessage` 로 부모에 전달: `{type:'mindlens-click', html, componentPath, kind, tag, text, x, y, viewportWidth, viewportHeight}`.
+- `postMessage` 로 부모에 전달: `{type:'mindlens-click', html, componentPath, kind, component, tag, text, selector, x, y, viewportWidth, viewportHeight}`.
   `text` 는 지금처럼 컴포넌트의 보이는 텍스트 180자, 이름이 필요한 곳의 라벨로만 쓴다.
 
 ## 4. 저장
 
 ### 4-1. 화면 해시
 
-부모 창(`participant-runner`)이 받은 `html` 의 SHA-256(`crypto.subtle`)을 계산한다.
-iframe 은 불투명 origin 이라 보안 컨텍스트가 보장되지 않으므로 해시는 부모에서 한다.
+`src/lib/screen-hash.ts` 의 `screenHash(html)` 하나를 클라이언트와 서버가 같이 쓴다
+(시드가 다른 cyrb53 두 개를 이은 28자리 16진수, 동기 함수).
+
+SHA-256(`crypto.subtle`)을 쓰지 않는 이유: 앱이 `0.0.0.0` 으로 떠서 같은 망의 다른 기기가
+`http://192.168.x.x:3000` 으로 참여할 수 있는데, 그 주소는 보안 컨텍스트가 아니라 `crypto.subtle` 이 없다.
+위조 방지는 서버의 재계산 대조(4-4)가 맡으므로 암호학적 해시일 필요는 없다.
+
+화면 ID 는 `${studyId}_${variant}_${hash}` 다(URL 경로에 그대로 넣을 수 있게 `:` 대신 `_`).
+클라이언트가 해시로 ID 를 바로 만들 수 있으므로 클릭 이벤트는 업로드 응답을 기다리지 않는다.
 
 ### 4-2. 테이블
 
@@ -124,8 +137,11 @@ CSS 미디어쿼리만으로 바뀌는 반응형은 DOM 이 같으므로 한 화
 `POST /api/sessions/[id]/screens` — `{variant, hash, html}`.
 
 - 세션이 완료됐으면 409(`mutableSession`).
-- `variant` 검증, `hash` 는 64자리 16진수, `html` 은 2MB 이하.
-- 서버가 `html` 의 SHA-256 을 다시 계산해 `hash` 와 다르면 400 — 클라이언트가 다른 화면을 같은 키로 덮지 못하게 한다.
+- `variant` 검증, `hash` 는 28자리 16진수, `html` 은 2,000,000자 이하(요청 본문 상한 8MB — 한글 3바이트 고려).
+- 서버가 `screenHash(html)` 을 다시 계산해 `hash` 와 다르면 400 — 클라이언트가 다른 화면을 같은 키로 덮지 못하게 한다.
+- `html` 은 `trim` 하지 않는다(해시가 달라진다).
+- 클라이언트는 2,000,000자를 넘는 화면을 아예 보내지 않고, 그 클릭은 `screenId` 없이 저장한다
+  (영구 400 이 이벤트 전송까지 막지 않게).
 - 이미 있으면 덮지 않고 200 (`INSERT ... ON CONFLICT DO NOTHING`).
 
 `POST /api/sessions/[id]/events` 는 `screenId` 가 있으면 그 화면이 같은 연구·시안에 존재하는지 확인하고 없으면 400.
@@ -142,9 +158,12 @@ CSS 미디어쿼리만으로 바뀌는 반응형은 DOM 이 같으므로 한 화
 
 ### 5-1. 데이터
 
-`GET /api/studies/[id]/results` 에 화면 목록을 추가한다: `screens: {id, variant, clickCount}[]` (HTML 제외).
-스냅샷 HTML 은 `GET /api/studies/[id]/screens/[screenId]` 로 따로 받는다(결과 전체가 무거워지지 않게).
-이 응답은 `Content-Security-Policy: sandbox allow-scripts` 로 내려준다.
+`GET /api/studies/[id]/results` 는 바꾸지 않는다. 클릭 이벤트가 이미 `screenId`·`componentPath`·`kind` 를
+갖고 있으므로 화면 목록과 화면별 컴포넌트 집계는 클라이언트가 **필터된 이벤트**에서 만든다
+(`src/lib/heatmap-groups.ts`). 그래야 참여자·시안 필터가 히트맵에도 그대로 걸린다.
+
+스냅샷 HTML 은 `GET /api/screens/[id]` 로 따로 받는다(결과 전체가 무거워지지 않게).
+이 응답은 `Content-Security-Policy: sandbox allow-scripts; frame-ancestors 'self'` 로 내려준다.
 
 ### 5-2. 화면 구성
 
@@ -152,7 +171,9 @@ CSS 미디어쿼리만으로 바뀌는 반응형은 DOM 이 같으므로 한 화
 - **가운데**: 고른 스냅샷을 `sandbox="allow-scripts"` iframe 에 띄운다.
   렌더 전 스냅샷에서 시안의 `<script>` 와 `on*` 속성을 제거하고 오버레이 스크립트 하나만 넣는다
   (시안 스크립트가 다시 실행돼 DOM 을 바꾸면 경로가 어긋난다).
-- **오버레이 스크립트**: 부모가 `postMessage` 로 `[{componentPath, count, kind}]` 를 보내면
+- **iframe 크기**: 그 화면 클릭들의 최빈 `viewportWidth`·`viewportHeight` 로 띄우고 패널 폭에 맞게
+  CSS `transform: scale()` 로 줄인다. 참여자가 본 레이아웃을 그대로 보여주기 위해서다.
+- **오버레이 스크립트**: iframe `load` 이후 부모가 `postMessage` 로 `[{componentPath, count, kind}]` 를 보내면
   `querySelector` 로 요소를 찾아 상자와 숫자 배지를 그린다. 색 농도는 클릭 수 / 그 화면 최대 클릭 수.
   `interactive` 는 하늘색(`#00A4DF`), `static` 은 주황(`#F18134`).
   - 열려 있던 `<dialog open>` 은 `open` 을 지우고 `showModal()` 로 다시 연다. 다이얼로그 안 요소의 상자는
@@ -178,7 +199,8 @@ CSS 미디어쿼리만으로 바뀌는 반응형은 DOM 이 같으므로 한 화
 
 `node` 테스트(기존 `tests/*.test.mjs` 방식):
 
-- 컴포넌트 결정 순수 함수: 가장 바깥쪽 선택, 60% 컨테이너 제외, 후보 없음 → `static`
+- 컴포넌트 결정 순수 함수: 가장 바깥쪽 선택, 60% 컨테이너 제외, 내부 상호작용 2개 이상 제외,
+  `data-component` 우선, 후보 없음 → `static`, `toString()` 직렬화 후에도 같은 결과
 - 서버 화면 저장: 해시 불일치 400, 같은 해시 재전송 시 1행 유지, 완료 세션 409
 - 이벤트 저장: 존재하지 않는 `screenId` 400
 
