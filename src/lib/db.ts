@@ -58,8 +58,11 @@ export function screenExists(id:string):boolean{return !!db().prepare('SELECT 1 
 export function getScreenHtml(id:string):string{return (required(db().prepare('SELECT html FROM screens WHERE id=?').get(id),'화면을 찾을 수 없습니다.') as {html:string}).html;}
 export function getRecording(id:string){return required(parse<Recording>(db().prepare('SELECT payload FROM recordings WHERE id=?').get(id)));}
 export function readRecording(id:string){const recording=getRecording(id);return {recording,bytes:readFileSync(path.join(recordingDir,recording.id))};}
-export function seedDemo(owner:string,durationSeconds:number) {
+// 같은 의뢰자가 「샘플 연구로 둘러보기」를 다시 눌러도 샘플 연구가 쌓이지 않게, 이미 있으면 그걸 돌려준다.
+export function seedDemo(owner:string,durationSeconds:number):{study:Study;created:boolean} {
+ const existing=db().prepare('SELECT payload FROM studies WHERE owner=? ORDER BY rowid DESC').all(owner).map(r=>parse<Study>(r)!).find(s=>s.isDemo);
+ if(existing)return {study:existing,created:false};
  const study=createStudy({owner,title:'프로젝트 대시보드 사용 경험 비교',description:'프로젝트 상태와 마감일을 확인하는 두 가지 대시보드. 목록 중심 시안과 상태별 보드 시안의 탐색 흐름을 비교합니다.',durationSeconds,isDemo:true,variantAName:'variant-a.html',variantBName:'variant-b.html'},readFileSync(path.join(process.cwd(),'public/demo/variant-a.html'),'utf8'),readFileSync(path.join(process.cwd(),'public/demo/variant-b.html'),'utf8'));
- return study;
+ return {study,created:true};
 }
 export function addComments(sessionId:string,comments:ParticipantComment[]) {return transaction(()=>{const statement=db().prepare('INSERT INTO comments(sessionId,payload) VALUES (?,?)');for(const c of comments)statement.run(sessionId,JSON.stringify({...c,sessionId,createdAt:new Date().toISOString()}));return comments.length;});}
