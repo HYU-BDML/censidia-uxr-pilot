@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { participantSessionKey, canResumeParticipant } from '../src/lib/participant-session.ts';
+import { participantSessionKey, canResumeParticipant } from '../../src/lib/participant-session.ts';
 const original = {studyId:'study-1',name:'Vini'};
 assert.equal(canResumeParticipant(original,'study-1','Other'),false,'different participant must not inherit progress');
 assert.equal(canResumeParticipant(original,'study-2','Vini'),false,'different study must not inherit progress');
