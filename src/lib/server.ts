@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SURVEY_QUESTIONS, type Variant, type ClickEvent, type Session } from './types';
+import { SURVEY_QUESTIONS, type Variant, type ClickEvent, type Session, type ParticipantComment } from './types';
 import * as store from './db';
 import { screenHash, screenId, SCREEN_HASH_PATTERN, MAX_SCREEN_CHARS, MAX_SCREENS_PER_VARIANT } from './screen-hash';
 import { prepareSnapshot, PROTOTYPE_CSP } from './snapshot';
@@ -45,3 +45,5 @@ export async function screensPost(request:Request,context:RouteContext){const {i
  if(!store.screenExists(screenId(s.studyId,v,b.hash))&&store.countScreens(s.studyId,v)>=MAX_SCREENS_PER_VARIANT)throw new store.HttpError(400,'화면 기록 한도를 넘었습니다.');
  return json(store.saveScreen(s.studyId,v,b.hash,b.html));}
 export async function screenGet(_request:Request,context:RouteContext){const {id}=await context.params;return new Response(prepareSnapshot(store.getScreenHtml(id)),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':`sandbox allow-scripts; frame-ancestors 'self'; ${PROTOTYPE_CSP}`}});}
+function cleanComment(e:Record<string,unknown>):ParticipantComment {return {variant:variant(e.variant),label:text(e.label??'알 수 없는 요소','컴포넌트',300,true),text:text(e.text,'의견',1000),elapsedMs:number(e.elapsedMs,'시간',0,86400000),viewportWidth:e.viewportWidth===undefined?undefined:number(e.viewportWidth,'화면 너비',1,100000),viewportHeight:e.viewportHeight===undefined?undefined:number(e.viewportHeight,'화면 높이',1,100000),screenId:e.screenId===undefined||e.screenId===null?undefined:text(e.screenId,'화면 ID',200),componentPath:typeof e.componentPath==='string'&&e.componentPath?text(e.componentPath,'컴포넌트 경로',1000):undefined,kind:e.kind==='static'?'static':e.kind==='interactive'?'interactive':undefined};}
+export async function commentsPost(request:Request,context:RouteContext){const {id}=await context.params;const s=mutableSession(id);const b=await body(request);if(!Array.isArray(b.comments)||b.comments.length>50)throw new store.HttpError(400,'의견은 한 번에 50개까지 저장할 수 있습니다.');const comments=b.comments.map((c:unknown)=>{if(!c||typeof c!=='object')throw new store.HttpError(400,'의견 형식을 확인해주세요.');return cleanComment(c as Record<string,unknown>);});for(const c of comments){if(c.screenId&&(!c.screenId.startsWith(`${s.studyId}_${c.variant}_`)||!store.screenExists(c.screenId)))throw new store.HttpError(400,'화면 기록을 먼저 저장해주세요.');}return json({saved:store.addComments(id,comments)});}

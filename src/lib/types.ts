@@ -9,7 +9,8 @@ export interface StoredAnswer extends SurveyAnswer { id:number;sessionId:string;
 export interface InterviewTurn {id:number;sessionId:string;variant:Variant;role:'assistant'|'user';text:string;elapsedSeconds:number;mode:'ai'|'demo';createdAt:string;}
 export interface Recording {id:string;sessionId:string;variant:Variant;mimeType:string;durationSeconds:number;createdAt:string;}
 export interface SessionDetail {session:Session;study:Study;events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];}
-export interface StudyResults {study:Study;sessions:Session[];events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];summary:{total:number;completed:number;preferenceA:number;preferenceB:number;preferenceTie:number;totalClicks:number;avgDurationSeconds:number;};}
+export interface StudyResults {study:Study;sessions:Session[];events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];comments:ParticipantComment[];summary:{total:number;completed:number;preferenceA:number;preferenceB:number;preferenceTie:number;totalClicks:number;avgDurationSeconds:number;};}
+export interface ParticipantComment { id?:number; sessionId?:string; variant:Variant; screenId?:string; componentPath?:string; label:string; kind?:'interactive'|'static'; text:string; elapsedMs:number; viewportWidth?:number; viewportHeight?:number; createdAt?:string; }
 export const SURVEY_QUESTIONS:SurveyQuestion[] = [
 {id:'clarity',question:'이 화면의 목적과 주요 기능을 이해하기 쉬웠나요?',options:['매우 쉬웠어요','쉬웠어요','보통이에요','어려웠어요','매우 어려웠어요']},
 {id:'navigation',question:'원하는 정보나 기능을 찾는 과정은 어땠나요?',options:['바로 찾았어요','대체로 쉽게 찾았어요','여러 번 살펴봤어요','찾기 어려웠어요','찾지 못했어요']},

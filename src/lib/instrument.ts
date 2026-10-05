@@ -3,7 +3,7 @@ import { PROTOTYPE_CSP } from './snapshot';
 
 /** 참가자 iframe → 부모 창 메시지. 클릭 1회 = 1개. */
 export type PrototypeClick = {
-  type: 'mindlens-click';
+  type: 'mindlens-click' | 'mindlens-pick';
   /** 클릭 순간(시안 핸들러 실행 전) DOM. 주입한 data-mindlens 요소는 제거됨 */
   html: string;
   /** body 부터 컴포넌트까지 tag:nth-of-type 경로 */
@@ -71,10 +71,29 @@ export function clickTracker(pick: typeof pickComponent): void {
     return '<!DOCTYPE html>' + clone.outerHTML;
   }
 
+  // 부모가 보내는 의견 모드 스위치. 켜져 있으면 클릭은 시안에 닿지 않고 'mindlens-pick' 으로만 올라간다.
+  let commentMode = false;
+  let modeStyle: HTMLStyleElement | null = null;
+  original.call(window, 'message', function (event: Event) {
+    const data = (event as MessageEvent).data;
+    if ((event as MessageEvent).source !== parent || !data || data.type !== 'mindlens-mode') return;
+    commentMode = !!data.comment;
+    if (commentMode && !modeStyle) {
+      modeStyle = document.createElement('style');
+      modeStyle.setAttribute('data-mindlens', '');
+      modeStyle.textContent = '*:hover{outline:2px dashed #00A4DF !important;outline-offset:-2px;cursor:crosshair !important}';
+      (document.head || document.documentElement).appendChild(modeStyle);
+    } else if (!commentMode && modeStyle) {
+      modeStyle.remove();
+      modeStyle = null;
+    }
+  }, false);
+
   // window 캡처 단계 = 시안 핸들러보다 먼저 → 화면이 바뀌기 전 상태가 스냅샷에 남는다.
   original.call(window, 'click', function (event: Event) {
     const raw = event.target;
     if (!(raw instanceof Element)) return;
+    if (commentMode) { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }
     const els: Element[] = [];
     let node: Element | null = raw;
     while (node && node !== document.body && node !== document.documentElement) { els.push(node); node = node.parentElement; }
@@ -90,7 +109,7 @@ export function clickTracker(pick: typeof pickComponent): void {
     if (el.id) selector += '#' + CSS.escape(el.id);
     else if (el.classList.length) selector += '.' + Array.from(el.classList).slice(0, 3).map(function (c) { return CSS.escape(c); }).join('.');
     const mouse = event as MouseEvent;
-    parent.postMessage({ type: 'mindlens-click', html: snapshot(), componentPath: pathOf(el), kind: picked.kind, component, tag: el.localName, text, selector, x: mouse.clientX, y: mouse.clientY, viewportWidth: innerWidth, viewportHeight: innerHeight }, '*');
+    parent.postMessage({ type: commentMode ? 'mindlens-pick' : 'mindlens-click', html: snapshot(), componentPath: pathOf(el), kind: picked.kind, component, tag: el.localName, text, selector, x: mouse.clientX, y: mouse.clientY, viewportWidth: innerWidth, viewportHeight: innerHeight }, '*');
   }, true);
 }
 
