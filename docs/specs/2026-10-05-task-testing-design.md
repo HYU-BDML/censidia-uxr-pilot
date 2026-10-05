@@ -29,7 +29,8 @@
 - `StudyTask { id ('t1'..); instruction; timeLimitSeconds; criteria: Record<Variant, TaskCriteria> }`, `Study.tasks?: StudyTask[]`
 - `TaskOutcome = 'success'|'timeout'|'gave_up'`
 - `TaskAttempt { taskId; variant; outcome; matchedBy?; durationMs; clickCount; firstClickCorrect?; evidenceScreenId?; lastScreenId?; verified?; sessionId?; createdAt? }`
-- `ClickEvent.phase?: string` — `'free'` 또는 `` `task:${taskId}` ``. 값이 없는 옛 이벤트는 자유 탐색으로 취급.
+- `ClickEvent.phase?: string` — `'free'` 또는 `` `task:${taskId}` ``. 값이 없는 옛 이벤트는 자유 탐색으로 취급. `ParticipantComment.phase?` 도 같다.
+- 시간 기준: `elapsedMs` = 이벤트가 속한 단계(phase)의 시작으로부터의 ms. phase 'free' 또는 없음 = 체험 시작 기준(재개 시 이어짐), `task:tN` = 그 과업 iframe 로드 시점 기준(`TaskAttempt.durationMs` 와 같은 기준). 서로 다른 단계의 값은 비교할 수 없다 — 정렬·min·max 전에 단계별로 묶을 것.
 - `StudyResults.taskAttempts: TaskAttempt[]`
 
 `src/lib/task-rules.ts` (값 import 없음, Node 테스트 가능)
@@ -63,3 +64,9 @@
 - 참가자: 과업마다 시안을 첫 상태로 다시 불러오고, 지시문 카드·남은 시간·「포기할게요」를 보여준다. 성공 시 「완료!」 후 다음 과업.
 - 결과: 새 「과업」 탭(과업 × 시안 비교, 실패 지점 화면). 흐름 타임라인은 과업 연구에서 과업 구간만 과업별로, 과업이 없는 연구는 기존처럼 전체.
   히트맵은 「전체 / 자유 탐색 / 과업 N」 필터.
+
+## 6. 범위 밖 · 알려진 동작
+
+- 설문 전에 모든 과업을 시도했는지는 서버가 강제하지 않는다(UI 가 강제). 서버 측 강제는 범위 밖.
+- 과업 기준(목표 컴포넌트·문구)은 `GET /api/studies/:id` 로 참가자에게 보인다. 설계상 의도다.
+- 서버의 문구 재검증(`htmlToText`)은 숨겨진 DOM 텍스트까지 포함해 iframe 의 `innerText` 확인보다 관대하다.

@@ -13,6 +13,9 @@ export const newTaskDraft=():TaskDraft=>({key:nextKey++,instruction:'',timeLimit
 export const tasksToDrafts=(tasks:StudyTask[]|undefined):TaskDraft[]=>(tasks||[]).map(t=>({key:nextKey++,instruction:t.instruction,timeLimitSeconds:t.timeLimitSeconds,criteria:{A:{...t.criteria.A},B:{...t.criteria.B}}}));
 export const draftsToPayload=(drafts:TaskDraft[])=>drafts.map(d=>({instruction:d.instruction,timeLimitSeconds:d.timeLimitSeconds,criteria:d.criteria}));
 const norm=(v:string)=>v.replace(/\s+/g,'').toLowerCase();
+const noEnter=(e:React.KeyboardEvent)=>{if(e.key==='Enter')e.preventDefault();};
+/** 참여자 iframe 의 document.body.innerText 에 가깝게: 닫힌 dialog·hidden·template·script·style·aria-hidden·display:none 을 뺀 본문 텍스트. */
+function visibleText(html:string):string{try{const doc=new DOMParser().parseFromString(html,'text/html');doc.querySelectorAll('dialog:not([open]),[hidden],template,script,style,[aria-hidden="true"]').forEach(n=>n.remove());doc.querySelectorAll<HTMLElement>('[style]').forEach(n=>{if(/display\s*:\s*none/i.test(n.getAttribute('style')||''))n.remove();});return doc.body?.textContent||'';}catch{return htmlToText(html);}}
 const small:React.CSSProperties={display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:'1px solid #E5E7EB',borderRadius:8,background:'#fff',color:'#454545',cursor:'pointer'};
 const ORANGE='#F18134';
 
@@ -46,7 +49,7 @@ export default function TaskEditor({htmlA,htmlB,value,onChange}:{htmlA:string|nu
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><strong className={s.label}>과업</strong><span className={s.hint}>{value.length} / {TASK_LIMITS.maxTasks}개</span></div>
     <p className={s.hint}>참여자는 자유 탐색 뒤 과업을 순서대로 수행합니다. 시안마다 완료 기준(목표 컴포넌트 또는 목표 문구)을 하나 이상 정해주세요. 둘 다 정하면 하나만 맞아도 성공입니다.</p>
     {value.map((x,i)=>{const v=tabs[x.key]||'A';const c=x.criteria[v];const text=html[v];
-      const dup=!!(c.text&&c.text.trim()&&text&&norm(htmlToText(text)).indexOf(norm(c.text))>=0);
+      const dup=!!(c.text&&c.text.trim()&&text&&norm(visibleText(text)).indexOf(norm(c.text))>=0);
       const none=!c.componentPath&&!(c.text&&c.text.trim());
       return <div key={x.key} style={{border:'1px solid #E5E7EB',borderRadius:12,padding:12,marginTop:10,background:'#fff'}}>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
@@ -57,7 +60,7 @@ export default function TaskEditor({htmlA,htmlB,value,onChange}:{htmlA:string|nu
         </div>
         <textarea aria-label={`과업 ${i+1} 지시문`} className={s.input} rows={2} maxLength={TASK_LIMITS.instructionMax} placeholder="참여자에게 보여줄 지시문 (예: 새 프로젝트를 만들어보세요)" value={x.instruction} onChange={e=>patch(x.key,{instruction:e.target.value})}/>
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:8,fontSize:13,color:'#454545'}}>제한 시간
-          <input aria-label={`과업 ${i+1} 제한 시간(초)`} type="number" min={TASK_LIMITS.timeMin} max={TASK_LIMITS.timeMax} className={s.input} style={{width:90,margin:0}} value={Number.isFinite(x.timeLimitSeconds)?x.timeLimitSeconds:''} onChange={e=>patch(x.key,{timeLimitSeconds:e.target.value===''?NaN:Number(e.target.value)})}/>초 ({TASK_LIMITS.timeMin}~{TASK_LIMITS.timeMax})</label>
+          <input aria-label={`과업 ${i+1} 제한 시간(초)`} type="number" min={TASK_LIMITS.timeMin} max={TASK_LIMITS.timeMax} className={s.input} style={{width:90,margin:0}} value={Number.isFinite(x.timeLimitSeconds)?x.timeLimitSeconds:''} onKeyDown={noEnter} onChange={e=>patch(x.key,{timeLimitSeconds:e.target.value===''?NaN:Number(e.target.value)})} onBlur={()=>{const n=x.timeLimitSeconds;patch(x.key,{timeLimitSeconds:Number.isFinite(n)?Math.min(TASK_LIMITS.timeMax,Math.max(TASK_LIMITS.timeMin,Math.round(n))):TASK_LIMITS.timeDefault});}}/>초 ({TASK_LIMITS.timeMin}~{TASK_LIMITS.timeMax})</label>
         <div style={{display:'flex',gap:6,marginTop:10}}>{(['A','B']as const).map(t=>{const set=!!(x.criteria[t].componentPath||(x.criteria[t].text&&x.criteria[t].text!.trim()));return <button key={t} type="button" onClick={()=>setTabs(o=>({...o,[x.key]:t}))} style={{padding:'5px 14px',borderRadius:999,border:'1px solid '+(v===t?'#00A4DF':'#E5E7EB'),background:v===t?'#E6F6FC':'#fff',color:v===t?'#0080b3':'#454545',fontSize:13,fontWeight:600,cursor:'pointer'}}>버전 {t}{set?' ✓':''}</button>})}</div>
         <div style={{marginTop:8,padding:10,borderRadius:8,background:'#F8FAFB'}}>
           <strong style={{fontSize:13}}>목표 컴포넌트</strong>
@@ -67,7 +70,7 @@ export default function TaskEditor({htmlA,htmlB,value,onChange}:{htmlA:string|nu
             {c.componentPath&&<><span style={{fontSize:13,color:'#0D0D0D'}}>선택됨: <strong>{c.componentLabel||c.componentPath}</strong></span><button type="button" className={s.button} onClick={()=>setCriteria(x.key,v,{componentPath:undefined,componentLabel:undefined})}>지우기</button></>}
           </div>
           <label style={{display:'block',marginTop:10,fontSize:13,fontWeight:600}} htmlFor={`task-${x.key}-text`}>목표 문구</label>
-          <input id={`task-${x.key}-text`} className={s.input} maxLength={TASK_LIMITS.textMax} placeholder="이 문구가 화면에 나타나면 성공 (선택)" value={c.text||''} onChange={e=>setCriteria(x.key,v,{text:e.target.value})}/>
+          <input id={`task-${x.key}-text`} className={s.input} maxLength={TASK_LIMITS.textMax} onKeyDown={noEnter} placeholder="이 문구가 화면에 나타나면 성공 (선택)" value={c.text||''} onChange={e=>setCriteria(x.key,v,{text:e.target.value})}/>
           {dup&&<p role="status" style={{margin:'6px 0 0',fontSize:12,color:ORANGE}}>첫 화면에 이미 있는 문구라 첫 클릭 직후 성공으로 처리될 수 있어요.</p>}
           {none&&<p style={{margin:'6px 0 0',fontSize:12,color:ORANGE}}>버전 {v}의 완료 기준(목표 컴포넌트 또는 목표 문구)을 하나 이상 지정해주세요.</p>}
         </div>

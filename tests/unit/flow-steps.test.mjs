@@ -58,3 +58,13 @@ test('taskIds 옵션: 과업 구간만, 참여자 x 과업 x 버전 레인(과�
 });
 
 test('taskIds 옵션이 빈 배열이면 빈 결과', () => assert.deepEqual(buildFlowLanes([ev({ phase: 'task:t1' })], { taskIds: [] }), []));
+
+test('attempts 옵션: 클릭 없이 끝난 시도도 빈 레인으로 포함한다(과업 순서·버전 순서 유지)', () => {
+  const lanes = buildFlowLanes([ev({ phase: 'task:t2', screenId: 'x' })], { taskIds: ['t1', 't2'], attempts: [{ sessionId: 's1', taskId: 't1', variant: 'A' }, { sessionId: 's1', taskId: 't2', variant: 'A' }, { sessionId: 's1', taskId: 'zz', variant: 'A' }] });
+  assert.deepEqual(lanes.map((l) => [l.sessionId, l.taskId, l.variant, l.steps.length]), [['s1', 't1', 'A', 0], ['s1', 't2', 'A', 1]]);
+});
+
+test('attempts 옵션: 이벤트가 전혀 없는 참여자도 레인이 생기고, 클릭 있는 레인과 중복되지 않는다', () => {
+  const lanes = buildFlowLanes([ev({ phase: 'task:t1', screenId: 'x' })], { taskIds: ['t1'], attempts: [{ sessionId: 's1', taskId: 't1', variant: 'A' }, { sessionId: 's2', taskId: 't1', variant: 'B' }] });
+  assert.deepEqual(lanes.map((l) => [l.sessionId, l.taskId, l.variant, l.steps.length]), [['s1', 't1', 'A', 1], ['s2', 't1', 'B', 0]]);
+});

@@ -3,6 +3,7 @@ export type SessionStatus = 'active' | 'survey' | 'completed';
 export interface CustomQuestion { id: string; type: 'choice' | 'text'; question: string; options: string[] }
 export interface Study { id:string; owner:string; title:string; description:string; durationSeconds:number; createdAt:string; isDemo:boolean; variantAName:string; variantBName:string; sessionCount?:number; completedCount?:number; customQuestions?:CustomQuestion[]; tasks?:StudyTask[]; }
 export interface Session { id:string; studyId:string; name:string; status:SessionStatus; currentVariant:Variant; order:Variant[]; startedAt:string; completedAt:string|null; elapsedA:number; elapsedB:number; preference:Variant|'tie'|null; preferenceReason:string; isDemo:boolean; }
+/** elapsedMs = ms since the start of the event's phase: phase 'free' or absent = since the experience start (resume-carried); 'task:tN' = since that task's iframe loaded (same base as TaskAttempt.durationMs). Values from different phases are not comparable — group by phase before sorting/min/max. */
 export interface ClickEvent { id?:number; sessionId?:string; variant:Variant; elapsedMs:number; component:string; tag:string; text:string; selector:string; x:number; y:number; viewportWidth:number; viewportHeight:number; source?:'prototype'|'platform'; createdAt?:string; screenId?:string; componentPath?:string; kind?:'interactive'|'static'; phase?:string; }
 export interface SurveyQuestion { id:string; question:string; options:string[]; }
 export interface SurveyAnswer { questionId:string; choice:string; otherText:string; }
@@ -11,7 +12,8 @@ export interface InterviewTurn {id:number;sessionId:string;variant:Variant;role:
 export interface Recording {id:string;sessionId:string;variant:Variant;mimeType:string;durationSeconds:number;createdAt:string;}
 export interface SessionDetail {session:Session;study:Study;events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];taskAttempts:TaskAttempt[];}
 export interface StudyResults {study:Study;sessions:Session[];events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];comments:ParticipantComment[];taskAttempts:TaskAttempt[];summary:{total:number;completed:number;preferenceA:number;preferenceB:number;preferenceTie:number;totalClicks:number;avgDurationSeconds:number;};}
-export interface ParticipantComment { id?:number; sessionId?:string; variant:Variant; screenId?:string; componentPath?:string; label:string; kind?:'interactive'|'static'; text:string; elapsedMs:number; viewportWidth?:number; viewportHeight?:number; createdAt?:string; }
+/** elapsedMs: same phase-relative time base as ClickEvent.elapsedMs (see there); phase absent = 'free'. */
+export interface ParticipantComment { id?:number; sessionId?:string; variant:Variant; screenId?:string; componentPath?:string; label:string; kind?:'interactive'|'static'; text:string; elapsedMs:number; phase?:string; viewportWidth?:number; viewportHeight?:number; createdAt?:string; }
 /** 과업 완료 기준(시안별). componentPath·text 중 하나 이상. componentLabel 은 목록이 다시 그려져 경로가 바뀔 때의 보조 매칭용. */
 export interface TaskCriteria { componentPath?:string; componentLabel?:string; text?:string; }
 /** 의뢰자가 설정하는 과업. 자유 탐색이 끝난 뒤 순서대로 진행한다. */

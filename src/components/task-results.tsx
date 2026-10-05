@@ -30,12 +30,12 @@ function Thumb({ screenId, viewport }: { screenId: string; viewport: { w: number
   );
 }
 
-function VariantColumn({ m, viewportOf }: { m: TaskMetric; viewportOf: (id: string) => { w: number; h: number } }) {
+function VariantColumn({ m, viewportOf, excluded }: { m: TaskMetric; viewportOf: (id: string) => { w: number; h: number }; excluded?: boolean }) {
   const rate = Math.round(m.successRate * 100);
   return (
     <div className={s.recordCard} style={{ minWidth: 0 }}>
       <span className={s.badge}>VERSION {m.variant}</span>
-      {m.attempts === 0 ? <p className={s.hint} style={{ marginTop: 10 }}>아직 시도한 참여자가 없습니다.</p> : <>
+      {m.attempts === 0 ? <p className={s.hint} style={{ marginTop: 10 }}>{excluded ? '버전 필터로 제외됨' : '아직 시도한 참여자가 없습니다.'}</p> : <>
         <div className={s.barRow} style={{ marginTop: 10 }}>
           <span>성공률</span>
           <div className={s.barTrack}><div className={s.barFill} style={{ width: `${rate}%`, background: COLOR[m.variant] }} /></div>
@@ -64,7 +64,7 @@ function VariantColumn({ m, viewportOf }: { m: TaskMetric; viewportOf: (id: stri
   );
 }
 
-export default function TaskResults({ tasks, attempts, events }: { tasks?: StudyTask[]; attempts: TaskAttempt[]; events: ClickEvent[] }) {
+export default function TaskResults({ tasks, attempts, events, variantFilter }: { tasks?: StudyTask[]; attempts: TaskAttempt[]; events: ClickEvent[]; variantFilter?: 'all' | 'A' | 'B' }) {
   const metrics = useMemo(() => computeTaskMetrics(tasks || [], attempts, events), [tasks, attempts, events]);
   const viewports = useMemo(() => { const map = new Map<string, { w: number; h: number }>(); for (const e of events) if (e.screenId && !map.has(e.screenId)) map.set(e.screenId, { w: e.viewportWidth || 1280, h: e.viewportHeight || 800 }); return map; }, [events]);
   const viewportOf = (id: string) => viewports.get(id) || { w: 1280, h: 800 };
@@ -76,7 +76,7 @@ export default function TaskResults({ tasks, attempts, events }: { tasks?: Study
           <h3>과업 {i + 1}</h3>
           <p style={{ fontSize: 14, margin: '4px 0 2px' }}>{t.instruction}</p>
           <p className={s.hint}>제한 시간 {t.timeLimitSeconds}초 · 선택한 참여자 기준</p>
-          <div className={s.twoCols}>{metrics.filter((m) => m.taskId === t.id).map((m) => <VariantColumn key={m.variant} m={m} viewportOf={viewportOf} />)}</div>
+          <div className={s.twoCols}>{metrics.filter((m) => m.taskId === t.id).map((m) => <VariantColumn key={m.variant} m={m} viewportOf={viewportOf} excluded={!!variantFilter && variantFilter !== 'all' && m.variant !== variantFilter} />)}</div>
         </section>
       ))}
     </>

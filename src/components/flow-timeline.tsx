@@ -110,7 +110,7 @@ function outcomeText(a?: TaskAttempt) {
 
 export default function FlowTimeline({ events, sessionName, tasks, attempts }: { events: ClickEvent[]; sessionName: (id?: string) => string; tasks?: StudyTask[]; attempts?: TaskAttempt[] }) {
   const hasTasks = !!tasks?.length;
-  const lanes = useMemo(() => buildFlowLanes(events, hasTasks ? { taskIds: tasks!.map((t) => t.id) } : undefined), [events, tasks, hasTasks]);
+  const lanes = useMemo(() => buildFlowLanes(events, hasTasks ? { taskIds: tasks!.map((t) => t.id), attempts } : undefined), [events, tasks, hasTasks, attempts]);
   const [open, setOpen] = useState<{ step: FlowStep; who: string } | null>(null);
   const close = useCallback(() => setOpen(null), []);
   if (!lanes.length) return <div className={s.empty} style={{ border: 0, padding: '42px 20px' }}>{hasTasks ? '과업 중 클릭 기록이 없습니다.' : '클릭 기록이 없습니다.'}</div>;
@@ -127,7 +127,8 @@ export default function FlowTimeline({ events, sessionName, tasks, attempts }: {
               <strong>{who} · 버전 {lane.variant}{taskIndex >= 0 && <> · 과업 {taskIndex + 1}: {tasks![taskIndex].instruction} · <span style={{ color: attempt?.outcome === 'success' && attempt.verified ? '#047857' : '#F18134' }}>{outcomeText(attempt)}</span></>}</strong>
               <span className={s.hint}>클릭 {clicks}회 · 화면 {lane.steps.length}개</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, marginTop: 10 }}>
+            {!lane.steps.length && <div style={{ marginTop: 10, border: '1px dashed #E5E7EB', borderRadius: 10, padding: '18px 12px', textAlign: 'center', color: '#454545', fontSize: 13 }}>클릭 없이 종료</div>}
+            <div style={{ display: 'flex', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, marginTop: lane.steps.length ? 10 : 0 }}>
               {lane.steps.map((step, i) => {
                 const prev = lane.steps[i - 1];
                 return (
