@@ -499,6 +499,7 @@
 
   <dialog id="confirmDialog" aria-labelledby="confirmTitle"><div class="confirm-body"><h2 id="confirmTitle"></h2><p id="confirmMsg"></p><div class="modal-actions"><button type="button" class="secondary-button" id="confirmCancel">취소</button><button type="button" class="primary-button" id="confirmOk">확인</button></div></div></dialog>
 
+  <ul id="projectIndex" hidden aria-hidden="true"></ul>
   <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button type="button" id="toastAction" hidden>되돌리기</button></div>
 
   <script>
@@ -659,7 +660,7 @@
       }
       const emptyRow = cols => `<tr><td colspan="${cols}"><div class="empty-state">조건에 맞는 프로젝트가 없습니다. 검색어나 필터를 바꿔보세요.</div></td></tr>`;
       function renderRows() {
-        filterChips('#overviewFilters'); filterChips('#projectFilters');
+        filterChips('#overviewFilters'); filterChips('#projectFilters'); renderIndex();
         const list = filtered();
         const ids = new Set(list.map(p => p.id));
         [...selected].forEach(id => { if (!ids.has(id)) selected.delete(id); });
@@ -681,6 +682,9 @@
         const n = selected.size;
         $('#bulkBar').hidden = n === 0; $('#bulkCount').textContent = `${n}개 선택됨`;
         const sa = $('#selectAll'); sa.checked = list.length > 0 && list.every(p => selected.has(p.id)); sa.indeterminate = n > 0 && !sa.checked;
+      }
+      function renderIndex() {
+        $('#projectIndex').innerHTML = projects.map(p => `<li data-project-id="${p.id}"><span data-field="name">${esc(p.name)}</span><span data-field="status" data-value="${p.status}">${STATUS[p.status]}</span><span data-field="priority" data-value="${p.priority}">${PRIORITY[p.priority]}</span><span data-field="owner" data-value="${p.owner}">${esc(memberName(p.owner))}</span><span data-field="due" data-value="${p.due}">${p.due}</span><span data-field="progress" data-value="${p.progress}">${p.progress}%</span><span data-field="tags" data-value="${esc(p.tags.join(','))}">${esc(p.tags.join(', '))}</span><span data-field="archived" data-value="${p.archived}">${p.archived ? '보관됨' : '활성'}</span></li>`).join('');
       }
       const metric = (label, value, sub = '', key = '') => `<div class="metric"${key ? ` data-metric="${key}"` : ''}><span>${label}</span><strong>${value}</strong><small>${sub}</small></div>`;
       const live = () => projects.filter(p => !p.archived);
@@ -770,11 +774,11 @@
 <div class="detail-stat"><span>태그</span><strong data-field="tags" data-value="${esc(p.tags.join(','))}">${p.tags.length ? esc(p.tags.join(', ')) : '없음'}</strong></div>
 <div class="tabs" role="tablist" aria-label="프로젝트 상세 탭">${tab('overview', '개요')}${tab('tasks', `작업 (${doneN}/${p.tasks.length})`)}${tab('comments', `댓글 (${p.comments.length})`)}${tab('activity', '활동')}</div>
 ${panel('overview', `<p class="detail-intro">${esc(p.description)}</p>
-<div class="field-grid"><label class="fld">상태<select class="detail-select" data-ctl="status" data-field="status">${STATUS_KEYS.map(k => opt(k, STATUS[k], p.status)).join('')}</select></label>
-<label class="fld">우선순위<select class="detail-select" data-ctl="priority" data-field="priority">${PRIORITY_KEYS.map(k => opt(k, PRIORITY[k], p.priority)).join('')}</select></label>
-<label class="fld">담당자<select class="detail-select" data-ctl="owner" data-field="owner">${ownerOptions(p.owner)}</select></label>
-<label class="fld">마감일<input class="input" type="date" data-ctl="due" data-field="due" value="${p.due}"></label></div>
-<div class="fld" style="margin-bottom:18px">진행률 (0–100)<div class="range-row"><input type="range" min="0" max="100" step="1" value="${p.progress}" data-ctl="progress" data-field="progress" aria-label="진행률 슬라이더"><input type="number" min="0" max="100" value="${p.progress}" data-ctl="progress-num" data-field="progress" aria-label="진행률 숫자"></div></div>
+<div class="field-grid"><label class="fld">상태<select class="detail-select" data-ctl="status" data-field="status" data-label="${STATUS[p.status]}">${STATUS_KEYS.map(k => opt(k, STATUS[k], p.status)).join('')}</select></label>
+<label class="fld">우선순위<select class="detail-select" data-ctl="priority" data-field="priority" data-label="${PRIORITY[p.priority]}">${PRIORITY_KEYS.map(k => opt(k, PRIORITY[k], p.priority)).join('')}</select></label>
+<label class="fld">담당자<select class="detail-select" data-ctl="owner" data-field="owner" data-label="${esc(memberName(p.owner))}">${ownerOptions(p.owner)}</select></label>
+<label class="fld">마감일<input class="input" type="date" data-ctl="due" data-field="due" data-label="${p.due}" value="${p.due}"></label></div>
+<div class="fld" style="margin-bottom:18px">진행률 (0–100)<div class="range-row"><input type="range" min="0" max="100" step="1" value="${p.progress}" data-ctl="progress" data-field="progress" data-label="${p.progress}%" aria-label="진행률 슬라이더"><input type="number" min="0" max="100" value="${p.progress}" data-ctl="progress-num" data-field="progress" data-label="${p.progress}%" aria-label="진행률 숫자"></div></div>
 <div class="fld">태그<div class="tag-list">${p.tags.map(t => `<span class="tag-chip">${esc(t)}<button type="button" data-tag-remove="${esc(t)}" aria-label="${esc(t)} 태그 삭제">×</button></span>`).join('') || '<span class="muted-note">태그가 없습니다.</span>'}</div><form class="inline-form" data-form="tag"><input class="input" name="tag" maxlength="14" placeholder="새 태그" aria-label="새 태그" data-draft="tag"><button type="submit" class="small-button">태그 추가</button></form></div>
 <div class="drawer-actions"><button type="button" class="small-button" data-act="archive">${p.archived ? '보관 해제(복원)' : '보관'}</button><button type="button" class="small-button danger" data-act="delete">프로젝트 삭제</button></div>`)}
 ${panel('tasks', `<ul class="task-list">${p.tasks.map(t => `<li data-task-id="${t.id}" data-done="${t.done}"><input type="checkbox" id="chk-${t.id}" data-field="done" ${t.done ? 'checked' : ''}><label class="t-label" for="chk-${t.id}" data-field="title">${esc(t.title)}</label><select data-ctl="task-assignee" data-field="assignee" aria-label="${esc(t.title)} 담당자">${assigneeOptions(t.assignee)}</select><button type="button" class="icon-x" data-task-delete="${t.id}" aria-label="${esc(t.title)} 삭제">×</button></li>`).join('') || '<li><span class="muted-note">작업이 없습니다.</span></li>'}</ul>
@@ -823,7 +827,7 @@ ${panel('activity', `<ul class="mini-feed">${pAct.length ? pAct.map(a => `<li>${
           progressBase = null; renderAll();
         } else {
           refreshLists();
-          $$('#drawer [data-field="progress"]').forEach(el => { if (el.tagName === 'INPUT') { if (el !== document.activeElement || el.type === 'range') el.value = v; } else el.textContent = v + '%'; });
+          $$('#drawer [data-field="progress"]').forEach(el => { if (el.tagName === 'INPUT') { if (el !== document.activeElement || el.type === 'range') el.value = v; el.dataset.label = v + '%'; } else el.textContent = v + '%'; });
         }
       }
       function deleteProject(p) {
