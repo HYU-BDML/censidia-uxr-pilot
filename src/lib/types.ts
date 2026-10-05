@@ -9,7 +9,7 @@ export interface SurveyAnswer { questionId:string; choice:string; otherText:stri
 export interface StoredAnswer extends SurveyAnswer { id:number;sessionId:string;variant:Variant;createdAt:string; }
 export interface InterviewTurn {id:number;sessionId:string;variant:Variant;role:'assistant'|'user';text:string;elapsedSeconds:number;mode:'ai'|'demo';createdAt:string;}
 export interface Recording {id:string;sessionId:string;variant:Variant;mimeType:string;durationSeconds:number;createdAt:string;}
-export interface SessionDetail {session:Session;study:Study;events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];}
+export interface SessionDetail {session:Session;study:Study;events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];taskAttempts:TaskAttempt[];}
 export interface StudyResults {study:Study;sessions:Session[];events:ClickEvent[];answers:StoredAnswer[];interviewTurns:InterviewTurn[];recordings:Recording[];comments:ParticipantComment[];taskAttempts:TaskAttempt[];summary:{total:number;completed:number;preferenceA:number;preferenceB:number;preferenceTie:number;totalClicks:number;avgDurationSeconds:number;};}
 export interface ParticipantComment { id?:number; sessionId?:string; variant:Variant; screenId?:string; componentPath?:string; label:string; kind?:'interactive'|'static'; text:string; elapsedMs:number; viewportWidth?:number; viewportHeight?:number; createdAt?:string; }
 /** 과업 완료 기준(시안별). componentPath·text 중 하나 이상. componentLabel 은 목록이 다시 그려져 경로가 바뀔 때의 보조 매칭용. */
