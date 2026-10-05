@@ -39,3 +39,22 @@ test('레인 순서: 세션 첫 등장 순, 같은 세션은 A 먼저', () => {
   const lanes = buildFlowLanes([ev({ sessionId: 's2', variant: 'B' }), ev({ sessionId: 's1' }), ev({ sessionId: 's2', variant: 'A' })]);
   assert.deepEqual(lanes.map((l) => [l.sessionId, l.variant]), [['s2', 'A'], ['s2', 'B'], ['s1', 'A']]);
 });
+
+test('옵션 없으면 phase 와 무관하게 전부 포함하고 taskId 는 없다(기존 동작)', () => {
+  const lanes = buildFlowLanes([ev({ phase: 'free', screenId: 'a' }), ev({ phase: 'task:t1', screenId: 'b' }), ev({ screenId: 'c' })]);
+  assert.equal(lanes.length, 1);
+  assert.equal(lanes[0].taskId, undefined);
+  assert.equal(lanes[0].steps.length, 3);
+});
+
+test('taskIds 옵션: 과업 구간만, 참여자 x 과업 x 버전 레인(과업 순서), 자유 탐색 제외', () => {
+  const lanes = buildFlowLanes([
+    ev({ phase: 'free', screenId: 'f', elapsedMs: 1 }), ev({ screenId: 'nophase', phase: undefined, elapsedMs: 2 }),
+    ev({ phase: 'task:t2', screenId: 'x', elapsedMs: 10 }), ev({ phase: 'task:t1', screenId: 'y', elapsedMs: 20 }), ev({ phase: 'task:t1', screenId: 'y', elapsedMs: 30 }),
+    ev({ phase: 'task:t1', variant: 'B', screenId: 'z', elapsedMs: 5 }), ev({ phase: 'task:t9', screenId: 'q' }),
+  ], { taskIds: ['t1', 't2'] });
+  assert.deepEqual(lanes.map((l) => [l.sessionId, l.taskId, l.variant, l.steps.length]), [['s1', 't1', 'A', 1], ['s1', 't1', 'B', 1], ['s1', 't2', 'A', 1]]);
+  assert.equal(lanes[0].steps[0].clicks.length, 2);
+});
+
+test('taskIds 옵션이 빈 배열이면 빈 결과', () => assert.deepEqual(buildFlowLanes([ev({ phase: 'task:t1' })], { taskIds: [] }), []));
