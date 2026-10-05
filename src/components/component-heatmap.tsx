@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClickEvent, ParticipantComment } from '@/lib/types';
 import { groupScreens } from '@/lib/heatmap-groups';
+import { loadScreen } from '@/lib/screen-cache';
 import s from './workspace.module.css';
 
 const COLOR = { interactive: '#00A4DF', static: '#F18134' } as const;
@@ -54,13 +55,10 @@ export default function ComponentHeatmap({ events, comments = [] }: { events: Cl
   // 스냅샷은 fetch 로 받아 srcDoc 으로 넣는다 — 불투명 출처 iframe 의 직접 내비게이션은 일부 브라우저에서 차단된다.
   useEffect(() => {
     if (!screenKey) return;
-    const ctl = new AbortController();
+    let alive = true;
     setHtml(''); setLoadError(false);
-    fetch(`/api/screens/${screenKey}`, { signal: ctl.signal })
-      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
-      .then(setHtml)
-      .catch((e) => { if (e?.name !== 'AbortError') setLoadError(true); });
-    return () => ctl.abort();
+    loadScreen(screenKey).then((h) => { if (alive) setHtml(h); }).catch(() => { if (alive) setLoadError(true); });
+    return () => { alive = false; };
   }, [screenKey]);
   useEffect(() => {
     const receive = (e: MessageEvent) => {

@@ -2,23 +2,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClickEvent } from '@/lib/types';
 import { buildFlowLanes, type FlowStep } from '@/lib/flow-steps';
+import { loadScreen } from '@/lib/screen-cache';
 import s from './workspace.module.css';
 
 const COLOR = { interactive: '#00A4DF', static: '#F18134' } as const;
 const CARD_W = 220;
 const CARD_PREVIEW_MAX_H = 170;
-
-// 화면 HTML 은 화면 id 당 한 번만 받는다. 10초 폴링으로 events 가 새로 와도 다시 받지 않는다.
-const htmlCache = new Map<string, Promise<string>>();
-function loadScreen(id: string): Promise<string> {
-  let p = htmlCache.get(id);
-  if (!p) {
-    p = fetch(`/api/screens/${id}`).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.text(); });
-    p.catch(() => htmlCache.delete(id)); // 실패는 캐시하지 않는다(다음 마운트에서 재시도)
-    htmlCache.set(id, p);
-  }
-  return p;
-}
 
 const fmt = (ms: number) => { const t = Math.max(0, ms) / 1000; const m = Math.floor(t / 60); return `${String(m).padStart(2, '0')}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 
@@ -119,7 +108,7 @@ export default function FlowTimeline({ events, sessionName }: { events: ClickEve
   const close = useCallback(() => setOpen(null), []);
   if (!lanes.length) return <div className={s.empty} style={{ border: 0, padding: '42px 20px' }}>클릭 기록이 없습니다.</div>;
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 18 }}>
       {lanes.map((lane) => {
         const who = sessionName(lane.sessionId || undefined);
         const clicks = lane.steps.reduce((n, st) => n + st.clicks.length, 0);
