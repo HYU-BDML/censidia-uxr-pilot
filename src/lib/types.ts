@@ -1,6 +1,7 @@
 export type Variant = 'A' | 'B';
 export type SessionStatus = 'active' | 'survey' | 'completed';
-export interface Study { id:string; owner:string; title:string; description:string; durationSeconds:number; createdAt:string; isDemo:boolean; variantAName:string; variantBName:string; sessionCount?:number; completedCount?:number; }
+export interface CustomQuestion { id: string; type: 'choice' | 'text'; question: string; options: string[] }
+export interface Study { id:string; owner:string; title:string; description:string; durationSeconds:number; createdAt:string; isDemo:boolean; variantAName:string; variantBName:string; sessionCount?:number; completedCount?:number; customQuestions?:CustomQuestion[]; }
 export interface Session { id:string; studyId:string; name:string; status:SessionStatus; currentVariant:Variant; order:Variant[]; startedAt:string; completedAt:string|null; elapsedA:number; elapsedB:number; preference:Variant|'tie'|null; preferenceReason:string; isDemo:boolean; }
 export interface ClickEvent { id?:number; sessionId?:string; variant:Variant; elapsedMs:number; component:string; tag:string; text:string; selector:string; x:number; y:number; viewportWidth:number; viewportHeight:number; source?:'prototype'|'platform'; createdAt?:string; screenId?:string; componentPath?:string; kind?:'interactive'|'static'; }
 export interface SurveyQuestion { id:string; question:string; options:string[]; }
