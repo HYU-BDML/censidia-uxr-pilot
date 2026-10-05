@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ClickEvent } from '@/lib/types';
+import type { ClickEvent, StudyTask, TaskAttempt } from '@/lib/types';
 import { buildFlowLanes, type FlowStep } from '@/lib/flow-steps';
 import { loadScreen } from '@/lib/screen-cache';
 import s from './workspace.module.css';
@@ -102,20 +102,29 @@ function Modal({ step, who, onClose }: { step: FlowStep; who: string; onClose: (
   );
 }
 
-export default function FlowTimeline({ events, sessionName }: { events: ClickEvent[]; sessionName: (id?: string) => string }) {
-  const lanes = useMemo(() => buildFlowLanes(events), [events]);
+function outcomeText(a?: TaskAttempt) {
+  if (!a) return '기록 없음';
+  if (a.outcome === 'success') return a.verified ? `성공 ${(a.durationMs / 1000).toFixed(1)}초` : `성공(검증 안 됨) ${(a.durationMs / 1000).toFixed(1)}초`;
+  return a.outcome === 'timeout' ? '시간 초과' : '포기';
+}
+
+export default function FlowTimeline({ events, sessionName, tasks, attempts }: { events: ClickEvent[]; sessionName: (id?: string) => string; tasks?: StudyTask[]; attempts?: TaskAttempt[] }) {
+  const hasTasks = !!tasks?.length;
+  const lanes = useMemo(() => buildFlowLanes(events, hasTasks ? { taskIds: tasks!.map((t) => t.id) } : undefined), [events, tasks, hasTasks]);
   const [open, setOpen] = useState<{ step: FlowStep; who: string } | null>(null);
   const close = useCallback(() => setOpen(null), []);
-  if (!lanes.length) return <div className={s.empty} style={{ border: 0, padding: '42px 20px' }}>클릭 기록이 없습니다.</div>;
+  if (!lanes.length) return <div className={s.empty} style={{ border: 0, padding: '42px 20px' }}>{hasTasks ? '과업 중 클릭 기록이 없습니다.' : '클릭 기록이 없습니다.'}</div>;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 18 }}>
       {lanes.map((lane) => {
         const who = sessionName(lane.sessionId || undefined);
         const clicks = lane.steps.reduce((n, st) => n + st.clicks.length, 0);
+        const taskIndex = lane.taskId ? tasks!.findIndex((t) => t.id === lane.taskId) : -1;
+        const attempt = lane.taskId ? attempts?.find((a) => a.taskId === lane.taskId && a.variant === lane.variant && a.sessionId === lane.sessionId) : undefined;
         return (
-          <div key={`${lane.sessionId}-${lane.variant}`} className={s.recordCard}>
+          <div key={`${lane.sessionId}-${lane.taskId || ''}-${lane.variant}`} className={s.recordCard}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <strong>{who} · 버전 {lane.variant}</strong>
+              <strong>{who} · 버전 {lane.variant}{taskIndex >= 0 && <> · 과업 {taskIndex + 1}: {tasks![taskIndex].instruction} · <span style={{ color: attempt?.outcome === 'success' && attempt.verified ? '#047857' : '#F18134' }}>{outcomeText(attempt)}</span></>}</strong>
               <span className={s.hint}>클릭 {clicks}회 · 화면 {lane.steps.length}개</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, marginTop: 10 }}>
