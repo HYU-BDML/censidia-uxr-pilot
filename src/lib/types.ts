@@ -15,12 +15,14 @@ export interface StudyResults {study:Study;sessions:Session[];events:ClickEvent[
 /** elapsedMs: same phase-relative time base as ClickEvent.elapsedMs (see there); phase absent = 'free'. */
 export interface ParticipantComment { id?:number; sessionId?:string; variant:Variant; screenId?:string; componentPath?:string; label:string; kind?:'interactive'|'static'; text:string; elapsedMs:number; phase?:string; viewportWidth?:number; viewportHeight?:number; createdAt?:string; }
 /** 과업 완료 기준(시안별). componentPath·text 중 하나 이상. componentLabel 은 목록이 다시 그려져 경로가 바뀔 때의 보조 매칭용. */
-export interface TaskCriteria { componentPath?:string; componentLabel?:string; text?:string; }
+export type StateProperty='text'|'value'|'checked'|'attr';
+export interface StateCriterion { anchor?:string; anchorIndex?:number; path:string; property:StateProperty; attr?:string; expected:string; match:'equals'|'contains'; label?:string; }
+export interface TaskCriteria { componentPath?:string; componentLabel?:string; state?:StateCriterion; }
 /** 의뢰자가 설정하는 과업. 자유 탐색이 끝난 뒤 순서대로 진행한다. */
 export interface StudyTask { id:string; instruction:string; timeLimitSeconds:number; criteria:Record<Variant,TaskCriteria>; }
 export type TaskOutcome = 'success'|'timeout'|'gave_up';
 /** 과업 시도 1회 = 1행. ClickEvent.phase 가 `task:${taskId}` 인 클릭들이 이 시도의 클릭이다(자유 탐색은 'free'). */
-export interface TaskAttempt { id?:number; sessionId?:string; taskId:string; variant:Variant; outcome:TaskOutcome; matchedBy?:'component'|'text'; durationMs:number; clickCount:number; firstClickCorrect?:boolean; evidenceScreenId?:string; lastScreenId?:string; verified?:boolean; createdAt?:string; }
+export interface TaskAttempt { id?:number; sessionId?:string; taskId:string; variant:Variant; outcome:TaskOutcome; matchedBy?:'component'|'state'; evidenceProof?:string; durationMs:number; clickCount:number; firstClickCorrect?:boolean; evidenceScreenId?:string; lastScreenId?:string; verified?:boolean; createdAt?:string; }
 export const SURVEY_QUESTIONS:SurveyQuestion[] = [
 {id:'clarity',question:'이 화면의 목적과 주요 기능을 이해하기 쉬웠나요?',options:['매우 쉬웠어요','쉬웠어요','보통이에요','어려웠어요','매우 어려웠어요']},
 {id:'navigation',question:'원하는 정보나 기능을 찾는 과정은 어땠나요?',options:['바로 찾았어요','대체로 쉽게 찾았어요','여러 번 살펴봤어요','찾기 어려웠어요','찾지 못했어요']},

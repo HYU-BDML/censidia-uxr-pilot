@@ -14,8 +14,8 @@ const createStudy = (tasks, owner = 'task-owner') => {
   return fetch(BASE + '/api/studies', { method: 'POST', body: f });
 };
 const good = [
-  { id: 'zzz', instruction: ' 설정 열기 ', timeLimitSeconds: 60, criteria: { A: { componentPath: 'main > button', componentLabel: 'A' }, B: { text: '설정' } } },
-  { instruction: '두번째', criteria: { A: { text: '완료' }, B: { text: '완료' } } },
+  { id: 'zzz', instruction: ' 설정 열기 ', timeLimitSeconds: 60, criteria: { A: { componentPath: 'main > button', componentLabel: 'A' }, B: { state: { path: 'select:nth-of-type(1)', property: 'value', expected: ' warning ' } } } },
+  { instruction: '두번째', criteria: { A: { state: { anchor: '#status', path: '', property: 'text', expected: '주의', match: 'contains' } }, B: { state: { anchor: '#status', path: '', property: 'text', expected: '주의' } } } },
 ];
 let study;
 
@@ -35,11 +35,19 @@ test('GET /api/studies/:id 가 tasks 를 돌려준다', async () => {
   const s = (await (await fetch(`${BASE}/api/studies/${study.id}`)).json()).study;
   assert.equal(s.tasks.length, 2);
   assert.equal(s.tasks[0].criteria.A.componentPath, 'main > button');
+  assert.deepEqual(s.tasks[0].criteria.B.state, { path: 'select:nth-of-type(1)', property: 'value', expected: 'warning', match: 'equals' });
+  assert.equal(s.tasks[1].criteria.A.state.match, 'contains');
 });
 
 test('잘못된 과업은 400', async () => {
   assert.equal((await createStudy('not json')).status, 400);
-  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { text: 'a' }, B: {} } }])).status, 400);
+  const st = { path: '', property: 'text', expected: 'a' };
+  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { state: st }, B: {} } }])).status, 400);
+  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { text: 'a' }, B: { state: st } } }])).status, 400);
+  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { state: { ...st, property: 'html' } }, B: { state: st } } }])).status, 400);
+  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { state: { ...st, property: 'attr' } }, B: { state: st } } }])).status, 400);
+  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { state: { ...st, expected: '' } }, B: { state: st } } }])).status, 400);
+  assert.equal((await createStudy([{ instruction: 'x', criteria: { A: { state: { ...st, anchor: 'a'.repeat(301) } }, B: { state: st } } }])).status, 400);
 });
 
 test('과업 없는 연구도 생성된다', async () => {
@@ -49,7 +57,7 @@ test('과업 없는 연구도 생성된다', async () => {
 
 test('PATCH: 소유자는 참여 전 수정 가능, 타인 403, 참여 후 409, 잘못된 입력 400', async () => {
   const path = `/api/studies/${study.id}/tasks`;
-  const next = [{ instruction: '수정됨', timeLimitSeconds: 30, criteria: { A: { text: 'a' }, B: { text: 'b' } } }];
+  const next = [{ instruction: '수정됨', timeLimitSeconds: 30, criteria: { A: { state: { path: '', property: 'text', expected: 'a' } }, B: { state: { path: '', property: 'checked', expected: 'true' } } } }];
   assert.equal((await patch(path, { owner: 'someone-else', tasks: next })).status, 403);
   assert.equal((await patch(path, { owner: 'task-owner', tasks: [{ instruction: 'x', criteria: {} }] })).status, 400);
   const ok = await patch(path, { owner: ' task-owner ', tasks: next });

@@ -13,7 +13,7 @@ const post = async (url, body) => { const r = await fetch(BASE + url, { method: 
 const { study } = await post('/api/demo', { owner: 'tester' });
 const db = new DatabaseSync(path.join(DIR, 'mindlens.sqlite'));
 const tasks = [
-  { id: 't1', instruction: '이번 주 마감인 프로젝트를 찾아보세요.', timeLimitSeconds: 120, criteria: { A: { text: '마감' }, B: { text: '마감' } } },
+  { id: 't1', instruction: "Orbit 모바일 앱의 상태를 '주의'로 바꿔보세요.", timeLimitSeconds: 120, criteria: { A: { state: { anchor: '[data-project-id="PRJ-101"]', path: 'span:nth-of-type(1)', property: 'text', expected: '주의', match: 'equals', label: 'Orbit 모바일 앱 · status' } }, B: { state: { path: 'select:nth-of-type(1)', property: 'value', expected: 'warning', match: 'equals' } } } },
   { id: 't2', instruction: '새 프로젝트를 만들어 보세요.', timeLimitSeconds: 90, criteria: { A: { componentLabel: '새 프로젝트' }, B: { componentLabel: '새 프로젝트' } } },
 ];
 db.prepare('UPDATE studies SET payload=? WHERE id=?').run(JSON.stringify({ ...study, tasks }), study.id);
@@ -43,14 +43,14 @@ for (const [i, s] of sessions.entries()) for (const v of ['A', 'B']) {
   }
 }
 // t1 A: 성공(검증) / 시간 초과 / 성공(검증 안 됨) / 포기  → 1/4, 평균 12.3초
-attempt(0, { taskId: 't1', variant: 'A', outcome: 'success', matchedBy: 'text', durationMs: 12300, firstClickCorrect: true, verified: true });
+attempt(0, { taskId: 't1', variant: 'A', outcome: 'success', matchedBy: 'state', durationMs: 12300, firstClickCorrect: true, verified: true });
 attempt(1, { taskId: 't1', variant: 'A', outcome: 'timeout', durationMs: 120000, firstClickCorrect: false, lastScreenId: screens.A[1] });
-attempt(2, { taskId: 't1', variant: 'A', outcome: 'success', matchedBy: 'text', durationMs: 30000, firstClickCorrect: true, verified: false });
+attempt(2, { taskId: 't1', variant: 'A', outcome: 'success', matchedBy: 'state', durationMs: 30000, firstClickCorrect: true, verified: false });
 attempt(3, { taskId: 't1', variant: 'A', outcome: 'gave_up', durationMs: 45000, firstClickCorrect: false, lastScreenId: screens.A[1] });
 // t1 B: 성공 3 / 시간 초과 1 → 3/4, 8,9,15초
-attempt(0, { taskId: 't1', variant: 'B', outcome: 'success', matchedBy: 'text', durationMs: 8000, firstClickCorrect: true, verified: true });
-attempt(1, { taskId: 't1', variant: 'B', outcome: 'success', matchedBy: 'text', durationMs: 9000, firstClickCorrect: true, verified: true });
-attempt(2, { taskId: 't1', variant: 'B', outcome: 'success', matchedBy: 'text', durationMs: 15000, firstClickCorrect: false, verified: true });
+attempt(0, { taskId: 't1', variant: 'B', outcome: 'success', matchedBy: 'state', durationMs: 8000, firstClickCorrect: true, verified: true });
+attempt(1, { taskId: 't1', variant: 'B', outcome: 'success', matchedBy: 'state', durationMs: 9000, firstClickCorrect: true, verified: true });
+attempt(2, { taskId: 't1', variant: 'B', outcome: 'success', matchedBy: 'state', durationMs: 15000, firstClickCorrect: false, verified: true });
 attempt(3, { taskId: 't1', variant: 'B', outcome: 'timeout', durationMs: 120000, firstClickCorrect: false, lastScreenId: screens.B[0] });
 // t2 A: 2/3 성공(검증), 1 포기 / t2 B: 4/4 성공
 attempt(0, { taskId: 't2', variant: 'A', outcome: 'success', matchedBy: 'component', durationMs: 20000, firstClickCorrect: true, verified: true });
