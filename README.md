@@ -39,12 +39,17 @@
 `.env.example`을 참고해 `.env.local`에 키를 입력합니다. 키는 브라우저로 전달하지 않습니다.
 
 ```env
-OPENAI_API_KEY=본인의_키
-OPENAI_INTERVIEW_MODEL=gpt-4.1-mini
-OPENAI_TRANSCRIBE_MODEL=whisper-1
+KIMI_API_KEY=본인의_키            # Moonshot 국제판 키 — https://api.moonshot.ai/v1 에서만 인증됩니다
+KIMI_BASE_URL=https://api.moonshot.ai/v1
+KIMI_INTERVIEW_MODEL=kimi-k3
+KIMI_THINKING=disabled            # 켜면 응답이 느려지고 짧은 답이 비어 올 수 있습니다
+MINDLENS_SPEECH_API_URL=          # 선택: 음성 전사 서버
+MINDLENS_SPEECH_API_TOKEN=
 ```
 
-키가 없거나 API 호출이 실패하면 인터뷰는 **데모 질문 모드**로 표시됩니다. 전사가 실패하면 오류를 표시하고 텍스트 답변을 사용할 수 있습니다. 키 설정 여부는 `/api/status`에서 확인하지만, 유효성 검증은 실제 API 호출로 확인해야 합니다.
+- AI 인터뷰 질문은 Kimi(OpenAI 호환 API)로 만듭니다. 키가 없거나 호출이 실패하면 **데모 질문 모드**로 표시됩니다.
+- Kimi에는 음성 전사 API가 없습니다. `MINDLENS_SPEECH_API_URL`이 없으면 전사 대신 직접 입력 안내가 뜨고, 녹음 파일은 그대로 저장됩니다.
+- 키 설정 여부는 `/api/status`(`aiProvider`)에서 확인하지만, 유효성은 실제 호출로 확인해야 합니다.
 
 ## 데이터 및 시연 범위
 
