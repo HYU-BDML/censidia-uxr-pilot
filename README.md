@@ -43,12 +43,14 @@ KIMI_API_KEY=본인의_키            # Moonshot 국제판 키 — https://api.m
 KIMI_BASE_URL=https://api.moonshot.ai/v1
 KIMI_INTERVIEW_MODEL=kimi-k3
 KIMI_THINKING=disabled            # 켜면 응답이 느려지고 짧은 답이 비어 올 수 있습니다
-MINDLENS_SPEECH_API_URL=          # 선택: 음성 전사 서버
+OPENAI_API_KEY=본인의_키          # 음성 전사(Whisper) 전용 — 크레딧이 있어야 동작합니다
+OPENAI_TRANSCRIBE_MODEL=whisper-1
+MINDLENS_SPEECH_API_URL=          # 선택: 별도 음성 전사 서버(설정되면 OpenAI보다 우선)
 MINDLENS_SPEECH_API_TOKEN=
 ```
 
 - AI 인터뷰 질문은 Kimi(OpenAI 호환 API)로 만듭니다. 키가 없거나 호출이 실패하면 **데모 질문 모드**로 표시됩니다.
-- Kimi에는 음성 전사 API가 없습니다. `MINDLENS_SPEECH_API_URL`이 없으면 전사 대신 직접 입력 안내가 뜨고, 녹음 파일은 그대로 저장됩니다.
+- 음성 전사는 OpenAI Whisper로 합니다(Kimi에는 음성 전사 API가 없습니다). 키가 없거나 크레딧이 없어 실패하면 직접 입력 안내가 뜨고, 녹음 파일은 그대로 저장됩니다.
 - 키 설정 여부는 `/api/status`(`aiProvider`)에서 확인하지만, 유효성은 실제 호출로 확인해야 합니다.
 
 ## 데이터 및 시연 범위
