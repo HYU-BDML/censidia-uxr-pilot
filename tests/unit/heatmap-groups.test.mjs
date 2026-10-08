@@ -2,7 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { groupScreens } from '../../src/lib/heatmap-groups.ts';
 
-const ev = (o) => ({ variant: 'A', elapsedMs: 0, component: 'c', tag: 'button', text: '', selector: '', x: 0, y: 0, viewportWidth: 1280, viewportHeight: 720, kind: 'interactive', ...o });
+const ev = (o) => ({
+  variant: 'A',
+  elapsedMs: 0,
+  component: 'c',
+  tag: 'button',
+  text: '',
+  selector: '',
+  x: 0,
+  y: 0,
+  viewportWidth: 1280,
+  viewportHeight: 720,
+  kind: 'interactive',
+  ...o,
+});
 
 test('화면별로 묶고 컴포넌트 경로별로 센다, 많은 순', () => {
   const { screens } = groupScreens([
@@ -11,7 +24,13 @@ test('화면별로 묶고 컴포넌트 경로별로 센다, 많은 순', () => {
     ev({ screenId: 's1', componentPath: 'body>p:nth-of-type(1)', component: '설명', kind: 'static' }),
     ev({ screenId: 's2', componentPath: 'body>button:nth-of-type(1)', variant: 'B' }),
   ]);
-  assert.deepEqual(screens.map((s) => [s.id, s.count]), [['s1', 3], ['s2', 1]]);
+  assert.deepEqual(
+    screens.map((s) => [s.id, s.count]),
+    [
+      ['s1', 3],
+      ['s2', 1],
+    ],
+  );
   assert.deepEqual(screens[0].components, [
     { path: 'body>a:nth-of-type(1)', label: '홈', kind: 'interactive', count: 2 },
     { path: 'body>p:nth-of-type(1)', label: '설명', kind: 'static', count: 1 },

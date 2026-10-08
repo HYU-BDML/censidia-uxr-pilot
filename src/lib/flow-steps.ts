@@ -2,7 +2,15 @@
 import type { ClickEvent, Variant } from './types';
 
 export type FlowClick = { path: string; label: string; kind: 'interactive' | 'static'; elapsedMs: number };
-export type FlowStep = { screenId: string | null; variant: Variant; startMs: number; endMs: number; viewportWidth: number; viewportHeight: number; clicks: FlowClick[] };
+export type FlowStep = {
+  screenId: string | null;
+  variant: Variant;
+  startMs: number;
+  endMs: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  clicks: FlowClick[];
+};
 export type FlowLane = { sessionId: string; variant: Variant; steps: FlowStep[]; taskId?: string };
 export type FlowOptions = { taskIds?: string[]; attempts?: { sessionId?: string; taskId: string; variant: Variant }[] };
 
@@ -13,17 +21,26 @@ export function buildFlowLanes(events: ClickEvent[], options?: FlowOptions): Flo
   // 클릭 없이 끝난 시도(시간 초과·포기)도 attempts 가 있으면 빈 레인으로 남긴다.
   const attempts = (options.attempts || []).filter((a) => options.taskIds!.includes(a.taskId));
   const sessions: string[] = [];
-  for (const e of events) { const sid = e.sessionId || ''; if (e.phase?.startsWith('task:') && options.taskIds.includes(e.phase.slice(5)) && !sessions.includes(sid)) sessions.push(sid); }
-  for (const a of attempts) { const sid = a.sessionId || ''; if (!sessions.includes(sid)) sessions.push(sid); }
-  const lanes: FlowLane[] = [];
-  for (const sid of sessions) for (const taskId of options.taskIds) {
-    const found = lanesOf(events.filter((e) => (e.sessionId || '') === sid && e.phase === `task:${taskId}`));
-    for (const variant of ['A', 'B'] as Variant[]) {
-      const lane = found.find((l) => l.variant === variant);
-      if (lane) lanes.push({ ...lane, taskId });
-      else if (attempts.some((a) => (a.sessionId || '') === sid && a.taskId === taskId && a.variant === variant)) lanes.push({ sessionId: sid, variant, steps: [], taskId });
-    }
+  for (const e of events) {
+    const sid = e.sessionId || '';
+    if (e.phase?.startsWith('task:') && options.taskIds.includes(e.phase.slice(5)) && !sessions.includes(sid))
+      sessions.push(sid);
   }
+  for (const a of attempts) {
+    const sid = a.sessionId || '';
+    if (!sessions.includes(sid)) sessions.push(sid);
+  }
+  const lanes: FlowLane[] = [];
+  for (const sid of sessions)
+    for (const taskId of options.taskIds) {
+      const found = lanesOf(events.filter((e) => (e.sessionId || '') === sid && e.phase === `task:${taskId}`));
+      for (const variant of ['A', 'B'] as Variant[]) {
+        const lane = found.find((l) => l.variant === variant);
+        if (lane) lanes.push({ ...lane, taskId });
+        else if (attempts.some((a) => (a.sessionId || '') === sid && a.taskId === taskId && a.variant === variant))
+          lanes.push({ sessionId: sid, variant, steps: [], taskId });
+      }
+    }
   return lanes;
 }
 
@@ -35,21 +52,41 @@ function lanesOf(events: ClickEvent[]): FlowLane[] {
     if (!sessions.includes(sid)) sessions.push(sid);
     const key = `${sid}\u0000${e.variant}`;
     const list = groups.get(key);
-    if (list) list.push(e); else groups.set(key, [e]);
+    if (list) list.push(e);
+    else groups.set(key, [e]);
   }
   const lanes: FlowLane[] = [];
   for (const sid of sessions) {
     for (const variant of ['A', 'B'] as Variant[]) {
       const list = groups.get(`${sid}\u0000${variant}`);
       if (!list) continue;
-      const sorted = list.map((e, i) => ({ e, i })).sort((a, b) => a.e.elapsedMs - b.e.elapsedMs || a.i - b.i).map((x) => x.e);
+      const sorted = list
+        .map((e, i) => ({ e, i }))
+        .sort((a, b) => a.e.elapsedMs - b.e.elapsedMs || a.i - b.i)
+        .map((x) => x.e);
       const steps: FlowStep[] = [];
       for (const e of sorted) {
         const screenId = e.screenId || null;
-        const click: FlowClick = { path: e.componentPath || '', label: e.component || e.tag || e.componentPath || '', kind: e.kind === 'static' ? 'static' : 'interactive', elapsedMs: e.elapsedMs };
+        const click: FlowClick = {
+          path: e.componentPath || '',
+          label: e.component || e.tag || e.componentPath || '',
+          kind: e.kind === 'static' ? 'static' : 'interactive',
+          elapsedMs: e.elapsedMs,
+        };
         const last = steps[steps.length - 1];
-        if (last && last.screenId === screenId) { last.clicks.push(click); last.endMs = e.elapsedMs; }
-        else steps.push({ screenId, variant, startMs: e.elapsedMs, endMs: e.elapsedMs, viewportWidth: e.viewportWidth, viewportHeight: e.viewportHeight, clicks: [click] });
+        if (last && last.screenId === screenId) {
+          last.clicks.push(click);
+          last.endMs = e.elapsedMs;
+        } else
+          steps.push({
+            screenId,
+            variant,
+            startMs: e.elapsedMs,
+            endMs: e.elapsedMs,
+            viewportWidth: e.viewportWidth,
+            viewportHeight: e.viewportHeight,
+            clicks: [click],
+          });
       }
       lanes.push({ sessionId: sid, variant, steps });
     }

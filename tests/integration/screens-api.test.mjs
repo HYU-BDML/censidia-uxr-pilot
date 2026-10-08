@@ -4,10 +4,13 @@ import { screenHash, MAX_SCREENS_PER_VARIANT } from '../../src/lib/screen-hash.t
 import { SURVEY_QUESTIONS } from '../../src/lib/types.ts';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:3100';
-const post = (path, body) => fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-const patch = (path, body) => fetch(BASE + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const post = (path, body) =>
+  fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const patch = (path, body) =>
+  fetch(BASE + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-const html = '<!DOCTYPE html><html><head></head><body><main><button>저장</button></main><script>1</script></body></html>';
+const html =
+  '<!DOCTYPE html><html><head></head><body><main><button>저장</button></main><script>1</script></body></html>';
 const hash = screenHash(html);
 let study, session;
 
@@ -19,10 +22,26 @@ before(async () => {
   session = (await r.json()).session;
 });
 
-const click = (extra) => ({ variant: session.currentVariant, elapsedMs: 10, component: '저장', tag: 'button', text: '저장', selector: 'button', x: 1, y: 1, viewportWidth: 800, viewportHeight: 600, ...extra });
+const click = (extra) => ({
+  variant: session.currentVariant,
+  elapsedMs: 10,
+  component: '저장',
+  tag: 'button',
+  text: '저장',
+  selector: 'button',
+  x: 1,
+  y: 1,
+  viewportWidth: 800,
+  viewportHeight: 600,
+  ...extra,
+});
 
 test('해시가 내용과 다르면 400', async () => {
-  const r = await post(`/api/sessions/${session.id}/screens`, { variant: session.currentVariant, hash: '0'.repeat(28), html });
+  const r = await post(`/api/sessions/${session.id}/screens`, {
+    variant: session.currentVariant,
+    hash: '0'.repeat(28),
+    html,
+  });
   assert.equal(r.status, 400);
 });
 
@@ -37,17 +56,37 @@ test('같은 화면은 한 번만 저장된다', async () => {
   const a = await first.json();
   assert.equal(a.id, `${study.id}_${session.currentVariant}_${hash}`);
   assert.equal(a.created, true);
-  const again = await (await post(`/api/sessions/${session.id}/screens`, { variant: session.currentVariant, hash, html })).json();
+  const again = await (
+    await post(`/api/sessions/${session.id}/screens`, { variant: session.currentVariant, hash, html })
+  ).json();
   assert.deepEqual(again, { id: a.id, created: false });
 });
 
 test('없는 화면을 가리키는 클릭은 400, 있는 화면은 저장', async () => {
-  const bad = await post(`/api/sessions/${session.id}/events`, { events: [click({ screenId: `${study.id}_${session.currentVariant}_${'f'.repeat(28)}`, componentPath: 'body>main:nth-of-type(1)>button:nth-of-type(1)', kind: 'interactive' })] });
+  const bad = await post(`/api/sessions/${session.id}/events`, {
+    events: [
+      click({
+        screenId: `${study.id}_${session.currentVariant}_${'f'.repeat(28)}`,
+        componentPath: 'body>main:nth-of-type(1)>button:nth-of-type(1)',
+        kind: 'interactive',
+      }),
+    ],
+  });
   assert.equal(bad.status, 400);
   const other = session.currentVariant === 'A' ? 'B' : 'A';
-  const wrongVariant = await post(`/api/sessions/${session.id}/events`, { events: [click({ variant: other, screenId: `${study.id}_${session.currentVariant}_${hash}` })] });
+  const wrongVariant = await post(`/api/sessions/${session.id}/events`, {
+    events: [click({ variant: other, screenId: `${study.id}_${session.currentVariant}_${hash}` })],
+  });
   assert.equal(wrongVariant.status, 400, '다른 시안의 화면을 가리키면 안 된다');
-  const ok = await post(`/api/sessions/${session.id}/events`, { events: [click({ screenId: `${study.id}_${session.currentVariant}_${hash}`, componentPath: 'body>main:nth-of-type(1)>button:nth-of-type(1)', kind: 'interactive' })] });
+  const ok = await post(`/api/sessions/${session.id}/events`, {
+    events: [
+      click({
+        screenId: `${study.id}_${session.currentVariant}_${hash}`,
+        componentPath: 'body>main:nth-of-type(1)>button:nth-of-type(1)',
+        kind: 'interactive',
+      }),
+    ],
+  });
   assert.equal(ok.status, 200);
   const detail = await (await fetch(`${BASE}/api/sessions/${session.id}`)).json();
   const saved = detail.events.at(-1);
@@ -88,8 +127,17 @@ test('완료한 세션은 화면을 더 저장할 수 없다(409)', async () => 
   assert.equal((await post(`/api/sessions/${session.id}/surveys`, { variant: first, answers })).status, 200);
   assert.equal((await patch(`/api/sessions/${session.id}`, { currentVariant: second })).status, 200);
   assert.equal((await post(`/api/sessions/${session.id}/surveys`, { variant: second, answers })).status, 200);
-  const done = await patch(`/api/sessions/${session.id}`, { elapsedA: 15, elapsedB: 15, preference: 'A', status: 'completed' });
+  const done = await patch(`/api/sessions/${session.id}`, {
+    elapsedA: 15,
+    elapsedB: 15,
+    preference: 'A',
+    status: 'completed',
+  });
   assert.equal(done.status, 200);
-  const r = await post(`/api/sessions/${session.id}/screens`, { variant: 'A', hash: screenHash('<p>late</p>'), html: '<p>late</p>' });
+  const r = await post(`/api/sessions/${session.id}/screens`, {
+    variant: 'A',
+    hash: screenHash('<p>late</p>'),
+    html: '<p>late</p>',
+  });
   assert.equal(r.status, 409);
 });

@@ -1,0 +1,8 @@
+node_modules
+.next
+data
+.claude
+.superpowers
+package-lock.json
+next-env.d.ts
+*.md

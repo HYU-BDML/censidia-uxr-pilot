@@ -1,2 +1,15 @@
 'use client';
-export default function ErrorPage({reset}:{error:Error;reset:()=>void}){return <main className="flex min-h-screen flex-col items-center justify-center gap-5"><h1 className="text-2xl font-semibold">화면을 불러오지 못했습니다.</h1><p className="text-muted">잠시 뒤 다시 시도해 주세요. 저장된 응답은 유지됩니다.</p><button className="btn btn-primary" onClick={reset}>다시 시도</button><a href="/" className="text-sm underline">시작 화면으로</a></main>}
+export default function ErrorPage({ reset }: { error: Error; reset: () => void }) {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-5">
+      <h1 className="text-2xl font-semibold">화면을 불러오지 못했습니다.</h1>
+      <p className="text-muted">잠시 뒤 다시 시도해 주세요. 저장된 응답은 유지됩니다.</p>
+      <button className="btn btn-primary" onClick={reset}>
+        다시 시도
+      </button>
+      <a href="/" className="text-sm underline">
+        시작 화면으로
+      </a>
+    </main>
+  );
+}

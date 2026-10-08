@@ -3,7 +3,10 @@ const htmlCache = new Map<string, Promise<string>>();
 export function loadScreen(id: string): Promise<string> {
   let p = htmlCache.get(id);
   if (!p) {
-    p = fetch(`/api/screens/${id}`).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.text(); });
+    p = fetch(`/api/screens/${id}`).then((r) => {
+      if (!r.ok) throw new Error(String(r.status));
+      return r.text();
+    });
     p.catch(() => htmlCache.delete(id)); // 실패는 캐시하지 않는다(다음 호출에서 재시도)
     htmlCache.set(id, p);
   }

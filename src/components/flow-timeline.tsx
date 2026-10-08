@@ -9,7 +9,11 @@ const COLOR = { interactive: '#00A4DF', static: '#F18134' } as const;
 const CARD_W = 220;
 const CARD_PREVIEW_MAX_H = 170;
 
-const fmt = (ms: number) => { const t = Math.max(0, ms) / 1000; const m = Math.floor(t / 60); return `${String(m).padStart(2, '0')}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
+const fmt = (ms: number) => {
+  const t = Math.max(0, ms) / 1000;
+  const m = Math.floor(t / 60);
+  return `${String(m).padStart(2, '0')}:${(t - m * 60).toFixed(1).padStart(4, '0')}`;
+};
 
 type Item = { path: string; count: number; kind: 'interactive' | 'static' };
 function stepItems(step: FlowStep): Item[] {
@@ -17,12 +21,27 @@ function stepItems(step: FlowStep): Item[] {
   for (const c of step.clicks) {
     if (!c.path) continue;
     const row = by.get(c.path);
-    if (row) row.count++; else by.set(c.path, { path: c.path, count: 1, kind: c.kind });
+    if (row) row.count++;
+    else by.set(c.path, { path: c.path, count: 1, kind: c.kind });
   }
   return Array.from(by.values());
 }
 
-function Snapshot({ step, width, maxHeight, lazy, highlight, interactive }: { step: FlowStep; width: number; maxHeight?: number; lazy: boolean; highlight?: string; interactive?: boolean }) {
+function Snapshot({
+  step,
+  width,
+  maxHeight,
+  lazy,
+  highlight,
+  interactive,
+}: {
+  step: FlowStep;
+  width: number;
+  maxHeight?: number;
+  lazy: boolean;
+  highlight?: string;
+  interactive?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [seen, setSeen] = useState(!lazy);
@@ -33,8 +52,19 @@ function Snapshot({ step, width, maxHeight, lazy, highlight, interactive }: { st
 
   useEffect(() => {
     if (seen || !box.current) return;
-    if (typeof IntersectionObserver === 'undefined') { setSeen(true); return; }
-    const io = new IntersectionObserver((entries) => { if (entries.some((x) => x.isIntersecting)) { setSeen(true); io.disconnect(); } }, { rootMargin: '200px' });
+    if (typeof IntersectionObserver === 'undefined') {
+      setSeen(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((x) => x.isIntersecting)) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '200px' },
+    );
     io.observe(box.current);
     return () => io.disconnect();
   }, [seen]);
@@ -43,8 +73,16 @@ function Snapshot({ step, width, maxHeight, lazy, highlight, interactive }: { st
     if (!seen || !screenId) return;
     let alive = true;
     setFailed(false);
-    loadScreen(screenId).then((h) => { if (alive) setHtml(h); }).catch(() => { if (alive) setFailed(true); });
-    return () => { alive = false; };
+    loadScreen(screenId)
+      .then((h) => {
+        if (alive) setHtml(h);
+      })
+      .catch(() => {
+        if (alive) setFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, [seen, screenId]);
 
   const send = useCallback(() => {
@@ -57,11 +95,48 @@ function Snapshot({ step, width, maxHeight, lazy, highlight, interactive }: { st
   const scale = width / vw;
   const height = Math.min(vh * scale, maxHeight ?? Infinity);
   return (
-    <div ref={box} style={{ width, height, overflow: 'hidden', position: 'relative', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8 }}>
-      {!screenId ? <p className={s.hint} style={{ padding: 12, textAlign: 'center', marginTop: height / 2 - 14 }}>스냅샷 없음</p>
-        : failed ? <p className={s.hint} style={{ padding: 12 }}>화면 기록을 불러오지 못했습니다.</p>
-        : !html ? <p className={s.hint} style={{ padding: 12 }}>{seen ? '불러오는 중…' : ''}</p>
-        : <iframe ref={frame} srcDoc={html} sandbox="allow-scripts" title="클릭 순간의 화면" onLoad={send} style={{ width: vw, height: vh, border: 0, transform: `scale(${scale})`, transformOrigin: '0 0', pointerEvents: interactive ? 'auto' : 'none', background: '#fff' }} />}
+    <div
+      ref={box}
+      style={{
+        width,
+        height,
+        overflow: 'hidden',
+        position: 'relative',
+        background: '#f3f4f6',
+        border: '1px solid #e5e7eb',
+        borderRadius: 8,
+      }}
+    >
+      {!screenId ? (
+        <p className={s.hint} style={{ padding: 12, textAlign: 'center', marginTop: height / 2 - 14 }}>
+          스냅샷 없음
+        </p>
+      ) : failed ? (
+        <p className={s.hint} style={{ padding: 12 }}>
+          화면 기록을 불러오지 못했습니다.
+        </p>
+      ) : !html ? (
+        <p className={s.hint} style={{ padding: 12 }}>
+          {seen ? '불러오는 중…' : ''}
+        </p>
+      ) : (
+        <iframe
+          ref={frame}
+          srcDoc={html}
+          sandbox="allow-scripts"
+          title="클릭 순간의 화면"
+          onLoad={send}
+          style={{
+            width: vw,
+            height: vh,
+            border: 0,
+            transform: `scale(${scale})`,
+            transformOrigin: '0 0',
+            pointerEvents: interactive ? 'auto' : 'none',
+            background: '#fff',
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -70,8 +145,25 @@ function ClickList({ step, onHover }: { step: FlowStep; onHover?: (path: string)
   return (
     <ol style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.6, color: '#454545' }}>
       {step.clicks.map((c, i) => (
-        <li key={i} onMouseEnter={() => onHover?.(c.path)} onMouseLeave={() => onHover?.('')} style={{ overflowWrap: 'anywhere' }}>
-          {c.kind === 'static' && <span title="누를 수 없는 곳" style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4, background: COLOR.static, marginRight: 4 }} />}
+        <li
+          key={i}
+          onMouseEnter={() => onHover?.(c.path)}
+          onMouseLeave={() => onHover?.('')}
+          style={{ overflowWrap: 'anywhere' }}
+        >
+          {c.kind === 'static' && (
+            <span
+              title="누를 수 없는 곳"
+              style={{
+                display: 'inline-block',
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                background: COLOR.static,
+                marginRight: 4,
+              }}
+            />
+          )}
           {c.label} <span style={{ color: '#8a8a8a' }}>({fmt(c.elapsedMs)})</span>
         </li>
       ))}
@@ -81,18 +173,54 @@ function ClickList({ step, onHover }: { step: FlowStep; onHover?: (path: string)
 
 function Modal({ step, who, onClose }: { step: FlowStep; who: string; onClose: () => void }) {
   const [hover, setHover] = useState('');
-  const [width] = useState(() => Math.max(320, Math.min(1000, (typeof window === 'undefined' ? 1000 : window.innerWidth) - 80)));
+  const [width] = useState(() =>
+    Math.max(320, Math.min(1000, (typeof window === 'undefined' ? 1000 : window.innerWidth) - 80)),
+  );
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label="화면 크게 보기" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,13,13,.55)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 20, maxHeight: '92vh', overflow: 'auto', width: 'fit-content', maxWidth: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-          <strong>{who} · 버전 {step.variant} · {fmt(step.startMs)} – {fmt(step.endMs)}</strong>
-          <button onClick={onClose} aria-label="닫기" className={s.badge} style={{ cursor: 'pointer', border: 0 }}>닫기</button>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="화면 크게 보기"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(13,13,13,.55)',
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: 14,
+          padding: 20,
+          maxHeight: '92vh',
+          overflow: 'auto',
+          width: 'fit-content',
+          maxWidth: '100%',
+        }}
+      >
+        <div
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 12 }}
+        >
+          <strong>
+            {who} · 버전 {step.variant} · {fmt(step.startMs)} – {fmt(step.endMs)}
+          </strong>
+          <button onClick={onClose} aria-label="닫기" className={s.badge} style={{ cursor: 'pointer', border: 0 }}>
+            닫기
+          </button>
         </div>
         <Snapshot step={step} width={width} lazy={false} highlight={hover} />
         <ClickList step={step} onHover={setHover} />
@@ -104,44 +232,137 @@ function Modal({ step, who, onClose }: { step: FlowStep; who: string; onClose: (
 
 function outcomeText(a?: TaskAttempt) {
   if (!a) return '기록 없음';
-  if (a.outcome === 'success') return a.verified ? `성공 ${(a.durationMs / 1000).toFixed(1)}초` : `성공(검증 안 됨) ${(a.durationMs / 1000).toFixed(1)}초`;
+  if (a.outcome === 'success')
+    return a.verified
+      ? `성공 ${(a.durationMs / 1000).toFixed(1)}초`
+      : `성공(검증 안 됨) ${(a.durationMs / 1000).toFixed(1)}초`;
   return a.outcome === 'timeout' ? '시간 초과' : '포기';
 }
 
-export default function FlowTimeline({ events, sessionName, tasks, attempts }: { events: ClickEvent[]; sessionName: (id?: string) => string; tasks?: StudyTask[]; attempts?: TaskAttempt[] }) {
+export default function FlowTimeline({
+  events,
+  sessionName,
+  tasks,
+  attempts,
+}: {
+  events: ClickEvent[];
+  sessionName: (id?: string) => string;
+  tasks?: StudyTask[];
+  attempts?: TaskAttempt[];
+}) {
   const hasTasks = !!tasks?.length;
-  const lanes = useMemo(() => buildFlowLanes(events, hasTasks ? { taskIds: tasks!.map((t) => t.id), attempts } : undefined), [events, tasks, hasTasks, attempts]);
+  const lanes = useMemo(
+    () => buildFlowLanes(events, hasTasks ? { taskIds: tasks!.map((t) => t.id), attempts } : undefined),
+    [events, tasks, hasTasks, attempts],
+  );
   const [open, setOpen] = useState<{ step: FlowStep; who: string } | null>(null);
   const close = useCallback(() => setOpen(null), []);
-  if (!lanes.length) return <div className={s.empty} style={{ border: 0, padding: '42px 20px' }}>{hasTasks ? '과업 중 클릭 기록이 없습니다.' : '클릭 기록이 없습니다.'}</div>;
+  if (!lanes.length)
+    return (
+      <div className={s.empty} style={{ border: 0, padding: '42px 20px' }}>
+        {hasTasks ? '과업 중 클릭 기록이 없습니다.' : '클릭 기록이 없습니다.'}
+      </div>
+    );
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 18 }}>
       {lanes.map((lane) => {
         const who = sessionName(lane.sessionId || undefined);
         const clicks = lane.steps.reduce((n, st) => n + st.clicks.length, 0);
         const taskIndex = lane.taskId ? tasks!.findIndex((t) => t.id === lane.taskId) : -1;
-        const attempt = lane.taskId ? attempts?.find((a) => a.taskId === lane.taskId && a.variant === lane.variant && a.sessionId === lane.sessionId) : undefined;
+        const attempt = lane.taskId
+          ? attempts?.find(
+              (a) => a.taskId === lane.taskId && a.variant === lane.variant && a.sessionId === lane.sessionId,
+            )
+          : undefined;
         return (
           <div key={`${lane.sessionId}-${lane.taskId || ''}-${lane.variant}`} className={s.recordCard}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <strong>{who} · 버전 {lane.variant}{taskIndex >= 0 && <> · 과업 {taskIndex + 1}: {tasks![taskIndex].instruction} · <span style={{ color: attempt?.outcome === 'success' && attempt.verified ? '#047857' : '#F18134' }}>{outcomeText(attempt)}</span></>}</strong>
-              <span className={s.hint}>클릭 {clicks}회 · 화면 {lane.steps.length}개</span>
+              <strong>
+                {who} · 버전 {lane.variant}
+                {taskIndex >= 0 && (
+                  <>
+                    {' '}
+                    · 과업 {taskIndex + 1}: {tasks![taskIndex].instruction} ·{' '}
+                    <span style={{ color: attempt?.outcome === 'success' && attempt.verified ? '#047857' : '#F18134' }}>
+                      {outcomeText(attempt)}
+                    </span>
+                  </>
+                )}
+              </strong>
+              <span className={s.hint}>
+                클릭 {clicks}회 · 화면 {lane.steps.length}개
+              </span>
             </div>
-            {!lane.steps.length && <div style={{ marginTop: 10, border: '1px dashed #E5E7EB', borderRadius: 10, padding: '18px 12px', textAlign: 'center', color: '#454545', fontSize: 13 }}>클릭 없이 종료</div>}
-            <div style={{ display: 'flex', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, marginTop: lane.steps.length ? 10 : 0 }}>
+            {!lane.steps.length && (
+              <div
+                style={{
+                  marginTop: 10,
+                  border: '1px dashed #E5E7EB',
+                  borderRadius: 10,
+                  padding: '18px 12px',
+                  textAlign: 'center',
+                  color: '#454545',
+                  fontSize: 13,
+                }}
+              >
+                클릭 없이 종료
+              </div>
+            )}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                overflowX: 'auto',
+                paddingBottom: 8,
+                marginTop: lane.steps.length ? 10 : 0,
+              }}
+            >
               {lane.steps.map((step, i) => {
                 const prev = lane.steps[i - 1];
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start' }}>
                     {prev && (
-                      <div aria-hidden style={{ width: 64, flex: 'none', textAlign: 'center', paddingTop: 48, color: '#8a8a8a', fontSize: 11 }}>
+                      <div
+                        aria-hidden
+                        style={{
+                          width: 64,
+                          flex: 'none',
+                          textAlign: 'center',
+                          paddingTop: 48,
+                          color: '#8a8a8a',
+                          fontSize: 11,
+                        }}
+                      >
                         <div>+{((step.startMs - prev.endMs) / 1000).toFixed(1)}초</div>
                         <div style={{ fontSize: 16, lineHeight: 1 }}>→</div>
                       </div>
                     )}
-                    <div role="button" tabIndex={0} onClick={() => setOpen({ step, who })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen({ step, who }); } }} title="크게 보기" style={{ width: CARD_W, flex: 'none', cursor: 'zoom-in', textAlign: 'left', border: '1px solid #E5E7EB', borderRadius: 10, padding: 8, background: '#fff' }}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setOpen({ step, who })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setOpen({ step, who });
+                        }
+                      }}
+                      title="크게 보기"
+                      style={{
+                        width: CARD_W,
+                        flex: 'none',
+                        cursor: 'zoom-in',
+                        textAlign: 'left',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: 10,
+                        padding: 8,
+                        background: '#fff',
+                      }}
+                    >
                       <Snapshot step={step} width={CARD_W - 18} maxHeight={CARD_PREVIEW_MAX_H} lazy />
-                      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 8, color: '#0D0D0D' }}>{fmt(step.startMs)} – {fmt(step.endMs)}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 8, color: '#0D0D0D' }}>
+                        {fmt(step.startMs)} – {fmt(step.endMs)}
+                      </div>
                       <ClickList step={step} />
                     </div>
                   </div>

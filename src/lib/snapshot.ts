@@ -23,7 +23,11 @@ export function heatmapOverlay(): void {
     for (let i = 0; i < dialogs.length; i++) {
       const d = dialogs[i] as HTMLDialogElement;
       d.removeAttribute('open');
-      try { d.showModal(); } catch { d.setAttribute('open', ''); }
+      try {
+        d.showModal();
+      } catch {
+        d.setAttribute('open', '');
+      }
     }
   }
 
@@ -37,8 +41,15 @@ export function heatmapOverlay(): void {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       let el: Element | null = null;
-      try { el = document.querySelector(item.path); } catch { el = null; }
-      if (!el) { missing.push(item.path); continue; }
+      try {
+        el = document.querySelector(item.path);
+      } catch {
+        el = null;
+      }
+      if (!el) {
+        missing.push(item.path);
+        continue;
+      }
       const r = el.getBoundingClientRect();
       // 모달 다이얼로그는 톱 레이어라 documentElement 에 붙인 상자보다 위에 뜬다 → 상자를 다이얼로그 안에 붙인다.
       const host = el.closest('dialog[open]') as HTMLElement | null;
@@ -90,7 +101,5 @@ export function prepareSnapshot(html: string): string {
   const overlay = `<script data-mindlens-overlay>(${heatmapOverlay.toString()})()</script>`;
   const headRe = /<head(?:\s[^>]*)?>/i;
   const withMeta = headRe.test(stripped) ? stripped.replace(headRe, (head) => head + meta) : meta + stripped;
-  return /<\/body\s*>/i.test(withMeta)
-    ? withMeta.replace(/<\/body\s*>/i, (end) => overlay + end)
-    : withMeta + overlay;
+  return /<\/body\s*>/i.test(withMeta) ? withMeta.replace(/<\/body\s*>/i, (end) => overlay + end) : withMeta + overlay;
 }

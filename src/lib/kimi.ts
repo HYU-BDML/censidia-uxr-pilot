@@ -12,7 +12,10 @@ export function kimiConfigured(): boolean {
   return Boolean(process.env.KIMI_API_KEY);
 }
 
-export async function kimiChat(messages: KimiMessage[], options: { maxTokens: number; temperature?: number; timeoutMs: number }): Promise<string> {
+export async function kimiChat(
+  messages: KimiMessage[],
+  options: { maxTokens: number; temperature?: number; timeoutMs: number },
+): Promise<string> {
   const key = process.env.KIMI_API_KEY;
   if (!key) throw new Error('KIMI_API_KEY missing');
   const base = (process.env.KIMI_BASE_URL || 'https://api.moonshot.ai/v1').replace(/\/+$/, '');
@@ -22,17 +25,30 @@ export async function kimiChat(messages: KimiMessage[], options: { maxTokens: nu
     fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: options.maxTokens, temperature: options.temperature, ...(withThinking && thinking ? { thinking } : {}) }),
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: options.maxTokens,
+        temperature: options.temperature,
+        ...(withThinking && thinking ? { thinking } : {}),
+      }),
       signal: AbortSignal.timeout(options.timeoutMs),
     });
   let response = await send(true);
   if (response.status === 400 && thinking) {
-    const failure = await response.clone().json().catch(() => ({}));
+    const failure = await response
+      .clone()
+      .json()
+      .catch(() => ({}));
     if (/thinking/i.test(String(failure.error?.message || ''))) response = await send(false);
   }
   if (!response.ok) {
     const failure = await response.json().catch(() => ({}));
-    console.warn('[MindLens] Kimi provider error', response.status, String(failure.error?.code || failure.error?.type || 'unknown'));
+    console.warn(
+      '[MindLens] Kimi provider error',
+      response.status,
+      String(failure.error?.code || failure.error?.type || 'unknown'),
+    );
     throw new Error(`Provider ${response.status}`);
   }
   const result = await response.json();

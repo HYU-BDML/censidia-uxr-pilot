@@ -26,7 +26,10 @@ export function pickComponent(chain: ChainItem[], viewportArea: number): Compone
   let best = -1;
   for (let i = 0; i < chain.length; i++) {
     const item = chain[i];
-    if (item.explicit) { best = i; continue; }
+    if (item.explicit) {
+      best = i;
+      continue;
+    }
     if (!item.interactive) continue;
     if (item.area >= viewportArea * 0.6) continue;
     if (item.descendants >= 2) continue;

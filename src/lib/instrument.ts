@@ -21,23 +21,50 @@ export type PrototypeClick = {
   viewportWidth: number;
   viewportHeight: number;
   /** 선택(mindlens-pick) 때만: 상태 기준 후보. 앵커·경로·표시 이름과 현재 속성 값들 */
-  stateTarget?: { anchor?: string; anchorIndex?: number; path: string; label: string; props: { text: string; value?: string; checked?: string; attrs: Record<string, string> } };
+  stateTarget?: {
+    anchor?: string;
+    anchorIndex?: number;
+    path: string;
+    label: string;
+    props: { text: string; value?: string; checked?: string; attrs: Record<string, string> };
+  };
 };
 
 /**
  * iframe 안에서 실행된다. toString() 으로 주입되므로 함수 밖 값을 참조하지 않고,
  * 컴포넌트 판정 함수는 인자로 받는다(같은 로직이 두 벌 생기지 않게).
  */
-export function clickTracker(pick: typeof pickComponent, match: typeof matchTask, readEl: typeof readElementState, stateOk: typeof stateMatches, resolve: typeof resolveStateElement): void {
+export function clickTracker(
+  pick: typeof pickComponent,
+  match: typeof matchTask,
+  readEl: typeof readElementState,
+  stateOk: typeof stateMatches,
+  resolve: typeof resolveStateElement,
+): void {
   const LISTENED = new WeakSet<Element>();
-  const TYPES: Record<string, true> = { click: true, pointerdown: true, pointerup: true, mousedown: true, mouseup: true, touchstart: true, touchend: true };
+  const TYPES: Record<string, true> = {
+    click: true,
+    pointerdown: true,
+    pointerup: true,
+    mousedown: true,
+    mouseup: true,
+    touchstart: true,
+    touchend: true,
+  };
   const original = EventTarget.prototype.addEventListener;
   // 시안 스크립트보다 먼저 실행되므로 이후 붙는 클릭 리스너를 전부 본다. 전역(window·document·html·body)은 제외.
-  EventTarget.prototype.addEventListener = function (this: EventTarget, type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
-    if (TYPES[type] && this instanceof Element && this !== document.documentElement && this !== document.body) LISTENED.add(this);
+  EventTarget.prototype.addEventListener = function (
+    this: EventTarget,
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions,
+  ) {
+    if (TYPES[type] && this instanceof Element && this !== document.documentElement && this !== document.body)
+      LISTENED.add(this);
     return original.call(this, type, listener, options);
   };
-  const INTERACTIVE = 'a[href],button,input:not([type=hidden]),select,textarea,label,summary,[onclick],[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=radio],[role=switch],[role=option],[tabindex],[data-component]';
+  const INTERACTIVE =
+    'a[href],button,input:not([type=hidden]),select,textarea,label,summary,[onclick],[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=radio],[role=switch],[role=option],[tabindex],[data-component]';
   const ROLES = /^(button|link|tab|menuitem|checkbox|radio|switch|option)$/;
 
   function isInteractive(el: Element): boolean {
@@ -60,7 +87,10 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
       const tag = node.localName;
       let n = 1;
       let sib = node.previousElementSibling;
-      while (sib) { if (sib.localName === tag) n++; sib = sib.previousElementSibling; }
+      while (sib) {
+        if (sib.localName === tag) n++;
+        sib = sib.previousElementSibling;
+      }
       parts.unshift(CSS.escape(tag) + ':nth-of-type(' + n + ')');
       node = node.parentElement;
     }
@@ -85,9 +115,13 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
       else if (l.localName === 'select') {
         const lo = (l as unknown as HTMLSelectElement).options;
         const co = (c as HTMLSelectElement).options;
-        for (let j = 0; j < lo.length && j < co.length; j++) { if (lo[j].selected) co[j].setAttribute('selected', ''); else co[j].removeAttribute('selected'); }
+        for (let j = 0; j < lo.length && j < co.length; j++) {
+          if (lo[j].selected) co[j].setAttribute('selected', '');
+          else co[j].removeAttribute('selected');
+        }
       } else if (l.type === 'checkbox' || l.type === 'radio') {
-        if (l.checked) c.setAttribute('checked', ''); else c.removeAttribute('checked');
+        if (l.checked) c.setAttribute('checked', '');
+        else c.removeAttribute('checked');
       } else if (l.type !== 'password' && l.type !== 'file') c.setAttribute('value', l.value);
     }
   }
@@ -110,7 +144,8 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
     }
     for (let i = 0; i < node.attributes.length; i++) {
       const at = node.attributes[i];
-      if (ANCHOR_ATTR.test(at.name) && at.value) return '[' + at.name + '="' + at.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+      if (ANCHOR_ATTR.test(at.name) && at.value)
+        return '[' + at.name + '="' + at.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
     }
     return null;
   }
@@ -121,19 +156,27 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
       const tag = node.localName;
       let n = 1;
       let sib = node.previousElementSibling;
-      while (sib) { if (sib.localName === tag) n++; sib = sib.previousElementSibling; }
+      while (sib) {
+        if (sib.localName === tag) n++;
+        sib = sib.previousElementSibling;
+      }
       parts.unshift(CSS.escape(tag) + ':nth-of-type(' + n + ')');
       node = node.parentElement;
     }
     return parts.join('>');
   }
-  function clip(v: string): string { return v.replace(/\s+/g, ' ').trim().slice(0, 200); }
+  function clip(v: string): string {
+    return v.replace(/\s+/g, ' ').trim().slice(0, 200);
+  }
   function stateTargetOf(raw: Element): PrototypeClick['stateTarget'] {
     // data-field / data-setting 이 붙은 가까운 조상이 있으면 그걸 대상으로 본다(글자만 감싼 <b> 같은 걸 피한다).
     let el: Element = raw;
     let up: Element | null = raw;
     while (up && up !== document.body && up !== document.documentElement) {
-      if (up.hasAttribute('data-field') || up.hasAttribute('data-setting')) { el = up; break; }
+      if (up.hasAttribute('data-field') || up.hasAttribute('data-setting')) {
+        el = up;
+        break;
+      }
       up = up.parentElement;
     }
     // 같은 선택자가 여러 요소와 맞을 수 있다(보드 카드·목록 행·상세 패널) → 보이는 앵커를 우선하고, 고른 요소의 순번을 함께 저장한다.
@@ -143,51 +186,80 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
     while (node && node !== document.body && node !== document.documentElement) {
       const sel = anchorSelector(node);
       if (sel) {
-        if (!anchorEl) { anchorEl = node; anchor = sel; }
-        if (node.getClientRects().length > 0) { anchorEl = node; anchor = sel; break; }
+        if (!anchorEl) {
+          anchorEl = node;
+          anchor = sel;
+        }
+        if (node.getClientRects().length > 0) {
+          anchorEl = node;
+          anchor = sel;
+          break;
+        }
       }
       node = node.parentElement;
     }
     let anchorIndex = 0;
-    if (anchorEl && anchor) anchorIndex = Math.max(0, Array.prototype.indexOf.call(document.querySelectorAll(anchor), anchorEl));
+    if (anchorEl && anchor)
+      anchorIndex = Math.max(0, Array.prototype.indexOf.call(document.querySelectorAll(anchor), anchorEl));
     const path = anchorEl ? (anchorEl === el ? '' : chainFrom(el, anchorEl)) : chainFrom(el, document.body);
     const field = el.getAttribute('data-field') || el.getAttribute('data-setting') || '';
     let name = '';
     if (anchorEl) {
       const nameEl = anchorEl.querySelector('[data-field="name"]') || anchorEl.querySelector('h1,h2,h3,h4,h5,h6');
-      if (nameEl && nameEl !== el) name = clip((nameEl as HTMLElement).innerText || nameEl.textContent || '').slice(0, 60);
-      else if (anchorEl.getAttribute('aria-label')) name = clip(anchorEl.getAttribute('aria-label') as string).slice(0, 60);
+      if (nameEl && nameEl !== el)
+        name = clip((nameEl as HTMLElement).innerText || nameEl.textContent || '').slice(0, 60);
+      else if (anchorEl.getAttribute('aria-label'))
+        name = clip(anchorEl.getAttribute('aria-label') as string).slice(0, 60);
     }
     const label = [name, field].filter(Boolean).join(' · ').slice(0, 100);
     const live = el as HTMLInputElement;
     const attrs: Record<string, string> = {};
     for (let i = 0; i < el.attributes.length; i++) {
       const at = el.attributes[i];
-      if (/^data-|^aria-/.test(at.name) || at.name === 'value' || at.name === 'checked' || at.name === 'selected' || at.name === 'class') attrs[at.name] = at.value.slice(0, 200);
+      if (
+        /^data-|^aria-/.test(at.name) ||
+        at.name === 'value' ||
+        at.name === 'checked' ||
+        at.name === 'selected' ||
+        at.name === 'class'
+      )
+        attrs[at.name] = at.value.slice(0, 200);
     }
-    const props: { text: string; value?: string; checked?: string; attrs: Record<string, string> } = { text: clip((el as HTMLElement).innerText || el.textContent || ''), attrs };
-    if (typeof live.value === 'string' && /^(input|select|textarea)$/.test(el.localName)) { props.value = live.value.slice(0, 200); attrs.value = props.value; }
-    if (el.localName === 'input' && (live.type === 'checkbox' || live.type === 'radio')) props.checked = String(!!live.checked);
+    const props: { text: string; value?: string; checked?: string; attrs: Record<string, string> } = {
+      text: clip((el as HTMLElement).innerText || el.textContent || ''),
+      attrs,
+    };
+    if (typeof live.value === 'string' && /^(input|select|textarea)$/.test(el.localName)) {
+      props.value = live.value.slice(0, 200);
+      attrs.value = props.value;
+    }
+    if (el.localName === 'input' && (live.type === 'checkbox' || live.type === 'radio'))
+      props.checked = String(!!live.checked);
     return { anchor, anchorIndex: anchorIndex || undefined, path, label, props };
   }
 
   // 부모가 보내는 의견 모드 스위치. 켜져 있으면 클릭은 시안에 닿지 않고 'mindlens-pick' 으로만 올라간다.
   let commentMode = false;
   let modeStyle: HTMLStyleElement | null = null;
-  original.call(window, 'message', function (event: Event) {
-    const data = (event as MessageEvent).data;
-    if ((event as MessageEvent).source !== parent || !data || data.type !== 'mindlens-mode') return;
-    commentMode = !!data.comment;
-    if (commentMode && !modeStyle) {
-      modeStyle = document.createElement('style');
-      modeStyle.setAttribute('data-mindlens', '');
-      modeStyle.textContent = '*:hover{outline:2px dashed #00A4DF !important;outline-offset:-2px}';
-      (document.head || document.documentElement).appendChild(modeStyle);
-    } else if (!commentMode && modeStyle) {
-      modeStyle.remove();
-      modeStyle = null;
-    }
-  }, false);
+  original.call(
+    window,
+    'message',
+    function (event: Event) {
+      const data = (event as MessageEvent).data;
+      if ((event as MessageEvent).source !== parent || !data || data.type !== 'mindlens-mode') return;
+      commentMode = !!data.comment;
+      if (commentMode && !modeStyle) {
+        modeStyle = document.createElement('style');
+        modeStyle.setAttribute('data-mindlens', '');
+        modeStyle.textContent = '*:hover{outline:2px dashed #00A4DF !important;outline-offset:-2px}';
+        (document.head || document.documentElement).appendChild(modeStyle);
+      } else if (!commentMode && modeStyle) {
+        modeStyle.remove();
+        modeStyle = null;
+      }
+    },
+    false,
+  );
 
   // 부모가 보내는 과업 기준. 활성 동안만 성공을 감시하고, 한 번 맞으면 스스로 해제한다(1회 발화).
   let criteria: TaskCriteria | null = null;
@@ -196,7 +268,10 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
   const timers: number[] = [];
   function clearTask(): void {
     criteria = null;
-    if (observer) { observer.disconnect(); observer = null; }
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
     clearTimeout(debounce);
     while (timers.length) clearTimeout(timers.pop() as number);
   }
@@ -210,7 +285,9 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
       const copy = el.cloneNode(true) as Element;
       mirror(el, copy);
       proof = copy.outerHTML.slice(0, 20000);
-    } catch (e) { return; }
+    } catch (e) {
+      return;
+    }
     clearTask();
     parent.postMessage({ type: 'mindlens-task-hit', by: 'state', html: snapshot(), proof }, '*');
   }
@@ -220,7 +297,10 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
     criteria = next;
     // 설정 순간에는 확인하지 않는다 — 이후의 클릭·입력·DOM 변화에서만 본다.
     if (next.state && document.body) {
-      observer = new MutationObserver(function () { clearTimeout(debounce); debounce = setTimeout(checkState, 150) as unknown as number; });
+      observer = new MutationObserver(function () {
+        clearTimeout(debounce);
+        debounce = setTimeout(checkState, 150) as unknown as number;
+      });
       observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
     }
   }
@@ -229,45 +309,100 @@ export function clickTracker(pick: typeof pickComponent, match: typeof matchTask
   }
   original.call(window, 'input', onFormEvent, true);
   original.call(window, 'change', onFormEvent, true);
-  original.call(window, 'message', function (event: Event) {
-    const data = (event as MessageEvent).data;
-    if ((event as MessageEvent).source !== parent || !data || data.type !== 'mindlens-task') return;
-    armTask(data.criteria || null);
-  }, false);
+  original.call(
+    window,
+    'message',
+    function (event: Event) {
+      const data = (event as MessageEvent).data;
+      if ((event as MessageEvent).source !== parent || !data || data.type !== 'mindlens-task') return;
+      armTask(data.criteria || null);
+    },
+    false,
+  );
 
   // window 캡처 단계 = 시안 핸들러보다 먼저 → 화면이 바뀌기 전 상태가 스냅샷에 남는다.
-  original.call(window, 'click', function (event: Event) {
-    const raw = event.target;
-    if (!(raw instanceof Element)) return;
-    if (commentMode) { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }
-    const els: Element[] = [];
-    let node: Element | null = raw;
-    while (node && node !== document.body && node !== document.documentElement) { els.push(node); node = node.parentElement; }
-    const chain = els.map(function (el) {
-      const r = el.getBoundingClientRect();
-      return { interactive: isInteractive(el), explicit: el.hasAttribute('data-component'), area: r.width * r.height, descendants: el.querySelectorAll(INTERACTIVE).length };
-    });
-    const picked = pick(chain, innerWidth * innerHeight);
-    const el = picked.index >= 0 ? els[picked.index] : document.body;
-    const text = ((el as HTMLElement).innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').trim().replace(/\s+/g, ' ').slice(0, 180);
-    const component = el.getAttribute('data-component') || el.getAttribute('aria-label') || text.slice(0, 40) || el.localName;
-    let selector = el.localName;
-    if (el.id) selector += '#' + CSS.escape(el.id);
-    else if (el.classList.length) selector += '.' + Array.from(el.classList).slice(0, 3).map(function (c) { return CSS.escape(c); }).join('.');
-    const mouse = event as MouseEvent;
-    const message: PrototypeClick = { type: commentMode ? 'mindlens-pick' : 'mindlens-click', html: snapshot(), componentPath: pathOf(el), kind: picked.kind, component, tag: el.localName, text, selector, x: mouse.clientX, y: mouse.clientY, viewportWidth: innerWidth, viewportHeight: innerHeight };
-    if (commentMode) message.stateTarget = stateTargetOf(raw);
-    parent.postMessage(message, '*');
-    if (!commentMode && criteria) {
-      const componentPath = pathOf(el);
-      if (match(criteria, { componentPath, label: component }) === 'component') {
-        clearTask();
-        parent.postMessage({ type: 'mindlens-task-hit', by: 'component' }, '*');
-      } else if (criteria.state) {
-        timers.push(setTimeout(checkState, 150) as unknown as number, setTimeout(checkState, 600) as unknown as number);
+  original.call(
+    window,
+    'click',
+    function (event: Event) {
+      const raw = event.target;
+      if (!(raw instanceof Element)) return;
+      if (commentMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
       }
-    }
-  }, true);
+      const els: Element[] = [];
+      let node: Element | null = raw;
+      while (node && node !== document.body && node !== document.documentElement) {
+        els.push(node);
+        node = node.parentElement;
+      }
+      const chain = els.map(function (el) {
+        const r = el.getBoundingClientRect();
+        return {
+          interactive: isInteractive(el),
+          explicit: el.hasAttribute('data-component'),
+          area: r.width * r.height,
+          descendants: el.querySelectorAll(INTERACTIVE).length,
+        };
+      });
+      const picked = pick(chain, innerWidth * innerHeight);
+      const el = picked.index >= 0 ? els[picked.index] : document.body;
+      const text = (
+        (el as HTMLElement).innerText ||
+        el.getAttribute('aria-label') ||
+        el.getAttribute('placeholder') ||
+        ''
+      )
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, 180);
+      const component =
+        el.getAttribute('data-component') || el.getAttribute('aria-label') || text.slice(0, 40) || el.localName;
+      let selector = el.localName;
+      if (el.id) selector += '#' + CSS.escape(el.id);
+      else if (el.classList.length)
+        selector +=
+          '.' +
+          Array.from(el.classList)
+            .slice(0, 3)
+            .map(function (c) {
+              return CSS.escape(c);
+            })
+            .join('.');
+      const mouse = event as MouseEvent;
+      const message: PrototypeClick = {
+        type: commentMode ? 'mindlens-pick' : 'mindlens-click',
+        html: snapshot(),
+        componentPath: pathOf(el),
+        kind: picked.kind,
+        component,
+        tag: el.localName,
+        text,
+        selector,
+        x: mouse.clientX,
+        y: mouse.clientY,
+        viewportWidth: innerWidth,
+        viewportHeight: innerHeight,
+      };
+      if (commentMode) message.stateTarget = stateTargetOf(raw);
+      parent.postMessage(message, '*');
+      if (!commentMode && criteria) {
+        const componentPath = pathOf(el);
+        if (match(criteria, { componentPath, label: component }) === 'component') {
+          clearTask();
+          parent.postMessage({ type: 'mindlens-task-hit', by: 'component' }, '*');
+        } else if (criteria.state) {
+          timers.push(
+            setTimeout(checkState, 150) as unknown as number,
+            setTimeout(checkState, 600) as unknown as number,
+          );
+        }
+      }
+    },
+    true,
+  );
 }
 
 export function instrument(html: string): string {

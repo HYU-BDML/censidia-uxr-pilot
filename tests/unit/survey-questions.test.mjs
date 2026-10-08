@@ -8,15 +8,21 @@ test('빈 입력은 빈 배열', () => {
 });
 
 test('id는 서버가 c1..cN으로 부여하고 클라이언트 id는 무시한다', () => {
-  const r = parseCustomQuestions([{ id: 'x', type: 'text', question: ' 의견? ' }, { id: 'c1', type: 'choice', question: '고르세요', options: [' 가 ', '나'] }]);
-  assert.deepEqual(r.map(q => q.id), ['c1', 'c2']);
+  const r = parseCustomQuestions([
+    { id: 'x', type: 'text', question: ' 의견? ' },
+    { id: 'c1', type: 'choice', question: '고르세요', options: [' 가 ', '나'] },
+  ]);
+  assert.deepEqual(
+    r.map((q) => q.id),
+    ['c1', 'c2'],
+  );
   assert.equal(r[0].question, '의견?');
   assert.deepEqual(r[0].options, []);
   assert.deepEqual(r[1].options, ['가', '나']);
 });
 
 test('개수 한도', () => {
-  const mk = n => Array.from({ length: n }, (_, i) => ({ type: 'text', question: `q${i}` }));
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ type: 'text', question: `q${i}` }));
   assert.equal(parseCustomQuestions(mk(MAX_CUSTOM_QUESTIONS)).length, 10);
   assert.throws(() => parseCustomQuestions(mk(11)), /10/);
 });
@@ -32,8 +38,14 @@ test('질문 길이와 형식 검증', () => {
 
 test('객관식 옵션 규칙', () => {
   assert.throws(() => parseCustomQuestions([{ type: 'choice', question: 'q', options: ['a'] }]));
-  assert.throws(() => parseCustomQuestions([{ type: 'choice', question: 'q', options: Array.from({ length: 9 }, (_, i) => `o${i}`) }]));
-  assert.equal(parseCustomQuestions([{ type: 'choice', question: 'q', options: Array.from({ length: 8 }, (_, i) => `o${i}`) }])[0].options.length, 8);
+  assert.throws(() =>
+    parseCustomQuestions([{ type: 'choice', question: 'q', options: Array.from({ length: 9 }, (_, i) => `o${i}`) }]),
+  );
+  assert.equal(
+    parseCustomQuestions([{ type: 'choice', question: 'q', options: Array.from({ length: 8 }, (_, i) => `o${i}`) }])[0]
+      .options.length,
+    8,
+  );
   assert.throws(() => parseCustomQuestions([{ type: 'choice', question: 'q', options: ['a', ' a '] }]), /중복/);
   assert.throws(() => parseCustomQuestions([{ type: 'choice', question: 'q', options: ['a', ''] }]));
   assert.throws(() => parseCustomQuestions([{ type: 'choice', question: 'q', options: ['a', 'b'.repeat(101)] }]));
@@ -55,7 +67,11 @@ test('객관식 답변은 옵션 중 하나', () => {
 });
 
 test('주관식 답변은 otherText 1~2000자 trim', () => {
-  assert.deepEqual(validateCustomAnswer(textQ, { otherText: '  좋음 ' }), { questionId: 'c2', choice: '', otherText: '좋음' });
+  assert.deepEqual(validateCustomAnswer(textQ, { otherText: '  좋음 ' }), {
+    questionId: 'c2',
+    choice: '',
+    otherText: '좋음',
+  });
   assert.throws(() => validateCustomAnswer(textQ, { otherText: '   ' }));
   assert.throws(() => validateCustomAnswer(textQ, { otherText: 'a'.repeat(2001) }));
   assert.throws(() => validateCustomAnswer(textQ, {}));

@@ -31,11 +31,14 @@ export type TaskHit = { componentPath?: string; label?: string };
 export function matchTask(criteria: TaskCriteria | null | undefined, hit: TaskHit): 'component' | null {
   if (!criteria) return null;
   const norm = function (value: string | undefined | null): string {
-    return String(value || '').replace(/\s+/g, '').toLowerCase();
+    return String(value || '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
   };
   if (criteria.componentPath && hit.componentPath) {
     if (hit.componentPath === criteria.componentPath) return 'component';
-    if (criteria.componentLabel && norm(criteria.componentLabel) && norm(criteria.componentLabel) === norm(hit.label)) return 'component';
+    if (criteria.componentLabel && norm(criteria.componentLabel) && norm(criteria.componentLabel) === norm(hit.label))
+      return 'component';
   }
   return null;
 }
@@ -46,7 +49,9 @@ export function matchTask(criteria: TaskCriteria | null | undefined, hit: TaskHi
  * toString 직렬화 가능 — 다른 모듈 수준 식별자를 참조하지 않는다.
  */
 export function resolveStateElement(state: StateCriterion, doc: Document): Element | null {
-  const root: Element | null = state.anchor ? doc.querySelectorAll(state.anchor)[state.anchorIndex || 0] || null : doc.body;
+  const root: Element | null = state.anchor
+    ? doc.querySelectorAll(state.anchor)[state.anchorIndex || 0] || null
+    : doc.body;
   if (!root) return null;
   return state.path ? root.querySelector(':scope > ' + state.path) : root;
 }
@@ -56,10 +61,18 @@ export function resolveStateElement(state: StateCriterion, doc: Document): Eleme
  */
 export function readElementState(el: Element, state: StateCriterion): string | null {
   try {
-    const any = el as unknown as { innerText?: string; textContent?: string | null; value?: unknown; checked?: unknown };
-    if (state.property === 'text') return String(any.innerText !== undefined && any.innerText !== null ? any.innerText : any.textContent || '');
-    if (state.property === 'value') return any.value !== undefined && any.value !== null ? String(any.value) : el.getAttribute('value');
-    if (state.property === 'checked') return any.checked !== undefined ? String(!!any.checked) : String(el.hasAttribute('checked'));
+    const any = el as unknown as {
+      innerText?: string;
+      textContent?: string | null;
+      value?: unknown;
+      checked?: unknown;
+    };
+    if (state.property === 'text')
+      return String(any.innerText !== undefined && any.innerText !== null ? any.innerText : any.textContent || '');
+    if (state.property === 'value')
+      return any.value !== undefined && any.value !== null ? String(any.value) : el.getAttribute('value');
+    if (state.property === 'checked')
+      return any.checked !== undefined ? String(!!any.checked) : String(el.hasAttribute('checked'));
     return state.attr ? el.getAttribute(state.attr) : null;
   } catch (e) {
     return null;
@@ -83,7 +96,9 @@ export function readState(state: StateCriterion, doc: Document): string | null {
 export function stateMatches(state: StateCriterion, observed: string | null | undefined): boolean {
   if (observed === null || observed === undefined) return false;
   const norm = function (value: string | undefined | null): string {
-    return String(value || '').replace(/\s+/g, '').toLowerCase();
+    return String(value || '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
   };
   const want = norm(state.expected);
   if (!want) return false;
@@ -97,26 +112,37 @@ function cleanState(raw: unknown, label: string): StateCriterion {
   const r = raw as Record<string, unknown>;
   const out: StateCriterion = { path: '', property: 'text', expected: '', match: 'equals' };
   if (r.anchor !== undefined && r.anchor !== null && r.anchor !== '') {
-    if (typeof r.anchor !== 'string' || !r.anchor.trim() || r.anchor.length > TASK_LIMITS.anchorMax) throw fail(`앵커 1~${TASK_LIMITS.anchorMax}자`);
+    if (typeof r.anchor !== 'string' || !r.anchor.trim() || r.anchor.length > TASK_LIMITS.anchorMax)
+      throw fail(`앵커 1~${TASK_LIMITS.anchorMax}자`);
     out.anchor = r.anchor;
   }
   if (r.anchorIndex !== undefined && r.anchorIndex !== null) {
-    if (typeof r.anchorIndex !== 'number' || !Number.isInteger(r.anchorIndex) || r.anchorIndex < 0 || r.anchorIndex > TASK_LIMITS.anchorIndexMax) throw fail(`앵커 순번 0~${TASK_LIMITS.anchorIndexMax}`);
+    if (
+      typeof r.anchorIndex !== 'number' ||
+      !Number.isInteger(r.anchorIndex) ||
+      r.anchorIndex < 0 ||
+      r.anchorIndex > TASK_LIMITS.anchorIndexMax
+    )
+      throw fail(`앵커 순번 0~${TASK_LIMITS.anchorIndexMax}`);
     if (r.anchorIndex > 0 && out.anchor) out.anchorIndex = r.anchorIndex;
   }
   if (r.path !== undefined && r.path !== null) {
-    if (typeof r.path !== 'string' || r.path.length > TASK_LIMITS.pathMax) throw fail(`경로 ${TASK_LIMITS.pathMax}자 이하`);
+    if (typeof r.path !== 'string' || r.path.length > TASK_LIMITS.pathMax)
+      throw fail(`경로 ${TASK_LIMITS.pathMax}자 이하`);
     out.path = r.path;
   }
-  if (r.property !== 'text' && r.property !== 'value' && r.property !== 'checked' && r.property !== 'attr') throw fail('읽을 값 종류');
+  if (r.property !== 'text' && r.property !== 'value' && r.property !== 'checked' && r.property !== 'attr')
+    throw fail('읽을 값 종류');
   out.property = r.property;
   if (r.property === 'attr') {
     if (typeof r.attr !== 'string' || !/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/.test(r.attr)) throw fail('속성 이름');
     out.attr = r.attr;
   }
-  if (typeof r.expected !== 'string' || !r.expected.trim() || r.expected.trim().length > TASK_LIMITS.expectedMax) throw fail(`목표 값 1~${TASK_LIMITS.expectedMax}자`);
+  if (typeof r.expected !== 'string' || !r.expected.trim() || r.expected.trim().length > TASK_LIMITS.expectedMax)
+    throw fail(`목표 값 1~${TASK_LIMITS.expectedMax}자`);
   out.expected = r.expected.trim();
-  if (r.match !== undefined && r.match !== null && r.match !== 'equals' && r.match !== 'contains') throw fail('일치 방식');
+  if (r.match !== undefined && r.match !== null && r.match !== 'equals' && r.match !== 'contains')
+    throw fail('일치 방식');
   out.match = r.match === 'contains' ? 'contains' : 'equals';
   if (typeof r.label === 'string' && r.label.trim()) out.label = r.label.trim().slice(0, TASK_LIMITS.labelMax);
   return out;
@@ -126,12 +152,15 @@ function cleanCriteria(raw: unknown, label: string): TaskCriteria {
   const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const out: TaskCriteria = {};
   if (c.componentPath !== undefined && c.componentPath !== null && c.componentPath !== '') {
-    if (typeof c.componentPath !== 'string' || c.componentPath.length > TASK_LIMITS.pathMax) throw new Error(`${label}의 목표 컴포넌트를 확인해주세요.`);
+    if (typeof c.componentPath !== 'string' || c.componentPath.length > TASK_LIMITS.pathMax)
+      throw new Error(`${label}의 목표 컴포넌트를 확인해주세요.`);
     out.componentPath = c.componentPath;
-    if (typeof c.componentLabel === 'string' && c.componentLabel.trim()) out.componentLabel = c.componentLabel.trim().slice(0, TASK_LIMITS.labelMax);
+    if (typeof c.componentLabel === 'string' && c.componentLabel.trim())
+      out.componentLabel = c.componentLabel.trim().slice(0, TASK_LIMITS.labelMax);
   }
   if (c.state !== undefined && c.state !== null) out.state = cleanState(c.state, label);
-  if (!out.componentPath && !out.state) throw new Error(`${label}에 완료 기준(목표 컴포넌트 또는 목표 상태)을 하나 이상 지정해주세요.`);
+  if (!out.componentPath && !out.state)
+    throw new Error(`${label}에 완료 기준(목표 컴포넌트 또는 목표 상태)을 하나 이상 지정해주세요.`);
   return out;
 }
 
@@ -144,9 +173,14 @@ export function parseTasks(raw: unknown): StudyTask[] {
     const t = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
     const n = i + 1;
     const instruction = typeof t.instruction === 'string' ? t.instruction.trim() : '';
-    if (!instruction || instruction.length > TASK_LIMITS.instructionMax) throw new Error(`과업 ${n}의 지시문은 1~${TASK_LIMITS.instructionMax}자로 입력해주세요.`);
-    const time = t.timeLimitSeconds === undefined || t.timeLimitSeconds === null || t.timeLimitSeconds === '' ? TASK_LIMITS.timeDefault : Number(t.timeLimitSeconds);
-    if (!Number.isInteger(time) || time < TASK_LIMITS.timeMin || time > TASK_LIMITS.timeMax) throw new Error(`과업 ${n}의 제한 시간은 ${TASK_LIMITS.timeMin}~${TASK_LIMITS.timeMax}초로 입력해주세요.`);
+    if (!instruction || instruction.length > TASK_LIMITS.instructionMax)
+      throw new Error(`과업 ${n}의 지시문은 1~${TASK_LIMITS.instructionMax}자로 입력해주세요.`);
+    const time =
+      t.timeLimitSeconds === undefined || t.timeLimitSeconds === null || t.timeLimitSeconds === ''
+        ? TASK_LIMITS.timeDefault
+        : Number(t.timeLimitSeconds);
+    if (!Number.isInteger(time) || time < TASK_LIMITS.timeMin || time > TASK_LIMITS.timeMax)
+      throw new Error(`과업 ${n}의 제한 시간은 ${TASK_LIMITS.timeMin}~${TASK_LIMITS.timeMax}초로 입력해주세요.`);
     const criteria = (t.criteria && typeof t.criteria === 'object' ? t.criteria : {}) as Record<string, unknown>;
     return {
       id: `t${n}`,
@@ -173,7 +207,8 @@ export function htmlToText(html: string): string {
 /** CSS 이스케이프 해제: 16진수(`\31 23` — 뒤의 공백 1개 포함)와 문자(`\x`) 이스케이프 모두. */
 const unescapeCss = (v: string) =>
   v.replace(/\\([0-9a-fA-F]{1,6})[ \t\n\r\f]?|\\([\s\S])/g, (_m, hex: string | undefined, ch: string | undefined) =>
-    hex ? String.fromCodePoint(Math.min(parseInt(hex, 16) || 0xfffd, 0x10ffff)) : (ch as string));
+    hex ? String.fromCodePoint(Math.min(parseInt(hex, 16) || 0xfffd, 0x10ffff)) : (ch as string),
+  );
 const escapeHtmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
 /** 앵커 선택자(#id 또는 [attr="value"])를 HTML 에서 찾을 문자열(id="…" / attr="…")로 바꾼다. 못 읽으면 null. */
@@ -192,11 +227,18 @@ function rootTag(proof: string): { tag: string; attrs: Record<string, string> } 
   const attrs: Record<string, string> = {};
   const re = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
   let a: RegExpExecArray | null;
-  while ((a = re.exec(m[2]))) attrs[a[1].toLowerCase()] = a[2] !== undefined ? a[2] : a[3] !== undefined ? a[3] : a[4] !== undefined ? a[4] : '';
+  while ((a = re.exec(m[2])))
+    attrs[a[1].toLowerCase()] = a[2] !== undefined ? a[2] : a[3] !== undefined ? a[3] : a[4] !== undefined ? a[4] : '';
   return { tag: m[1].toLowerCase(), attrs };
 }
 
-const decodeAttr = (v: string) => v.replace(/&quot;/gi, '"').replace(/&#39;/g, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&');
+const decodeAttr = (v: string) =>
+  v
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
 
 /** 증명 문자열만 보고 state.property 의 값을 읽는다(서버에는 DOM 이 없다). */
 function proofValue(state: StateCriterion, proof: string): string | null {
@@ -204,7 +246,10 @@ function proofValue(state: StateCriterion, proof: string): string | null {
   if (!root) return null;
   if (state.property === 'text') return htmlToText(proof);
   if (state.property === 'checked') return String('checked' in root.attrs);
-  if (state.property === 'attr') return state.attr && state.attr.toLowerCase() in root.attrs ? decodeAttr(root.attrs[state.attr.toLowerCase()]) : null;
+  if (state.property === 'attr')
+    return state.attr && state.attr.toLowerCase() in root.attrs
+      ? decodeAttr(root.attrs[state.attr.toLowerCase()])
+      : null;
   if (root.tag === 'select') {
     const opt = /<option\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)(?=<\/option|<option\b|$)/gi;
     let first: string | null = null;
@@ -240,7 +285,10 @@ export function verifyAttempt(
 ): boolean {
   if (attempt.outcome !== 'success') return true;
   const criteria = task.criteria[variant];
-  if (attempt.matchedBy === 'component') return clicks.some((c) => matchTask(criteria, { componentPath: c.componentPath, label: c.component }) === 'component');
+  if (attempt.matchedBy === 'component')
+    return clicks.some(
+      (c) => matchTask(criteria, { componentPath: c.componentPath, label: c.component }) === 'component',
+    );
   if (attempt.matchedBy === 'state') {
     const state = criteria.state;
     if (!state || !evidenceHtml || !evidenceProof || !evidenceProof.trim()) return false;
@@ -248,9 +296,16 @@ export function verifyAttempt(
     const needle = state.anchor ? anchorNeedle(state.anchor) : null;
     if (state.anchor && !needle) return false;
     let found = false;
-    for (let at = evidenceHtml.indexOf(evidenceProof); at >= 0 && !found; at = evidenceHtml.indexOf(evidenceProof, at + 1)) {
+    for (
+      let at = evidenceHtml.indexOf(evidenceProof);
+      at >= 0 && !found;
+      at = evidenceHtml.indexOf(evidenceProof, at + 1)
+    ) {
       if (!needle) found = true;
-      else { const a = evidenceHtml.indexOf(needle); found = a >= 0 && a < at + evidenceProof.length; }
+      else {
+        const a = evidenceHtml.indexOf(needle);
+        found = a >= 0 && a < at + evidenceProof.length;
+      }
     }
     if (!found) return false;
     return stateMatches(state, proofValue(state, evidenceProof));

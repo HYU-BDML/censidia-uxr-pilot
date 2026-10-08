@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:3100';
-const post = (path, body) => fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const post = (path, body) =>
+  fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 test('같은 의뢰자가 샘플 연구를 다시 누르면 기존 샘플 연구를 돌려준다', async () => {
   const owner = `demo-reuse-${Date.now()}`;
